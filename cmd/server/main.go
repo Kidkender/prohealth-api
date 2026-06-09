@@ -17,7 +17,9 @@ func main() {
 
 	r := gin.Default()
 
-	routes.RegisterRoutes(r, db)
+	r.Use(middleware.CorsMiddleware())
 	r.Use(middleware.AuthMiddleware())
+
+	routes.RegisterRoutes(r, db)
 	r.Run(":8080")
 }

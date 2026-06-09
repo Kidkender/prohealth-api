@@ -12,7 +12,10 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 
 	authService := service.NewAuthService(db)
 	authHandler := handler.NewAuthHandler(authService)
+	userService := service.NewUserService(db)
+	userHandler := handler.NewUserHandler(userService)
 
 	api.GET("/health", handler.HealthCheck)
 	RegisterAuthRoutes(api, authHandler)
+	RegisterUserRoutes(api, userHandler)
 }

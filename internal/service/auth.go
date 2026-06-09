@@ -94,3 +94,30 @@ func (s *AuthService) Login(
 		Token:  token,
 	}, nil
 }
+
+func (s *AuthService) ChangePassword(
+	ctx context.Context,
+	userID uint,
+	req *dto.ChangePasswordInput,
+) error {
+	var user model.User
+	if err := s.db.Where("id = ?", userID).First(&user).Error; err != nil {
+		return err
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.OldPassword)); err != nil {
+		return apperror.ErrInvalidCredentials
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	user.Password = string(hash)
+	if err := s.db.Save(&user).Error; err != nil {
+		return err
+	}
+
+	return nil
+}

@@ -54,3 +54,22 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		"data":    result,
 	})
 }
+
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	var req dto.ChangePasswordInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		apperror.ValidationError(c, err)
+		return
+	}
+
+	userID := c.GetUint("user_id")
+	err := h.authService.ChangePassword(c, userID, &req)
+	if err != nil {
+		apperror.HandleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": "ok",
+	})
+}

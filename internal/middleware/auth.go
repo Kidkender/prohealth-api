@@ -1,6 +1,13 @@
 package middleware
 
-import "github.com/gin-gonic/gin"
+import (
+	"log"
+	"net/http"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/kidkender/prohealth-api/internal/security"
+)
 
 func AuthMiddleware() gin.HandlerFunc {
 
@@ -16,15 +23,27 @@ func AuthMiddleware() gin.HandlerFunc {
 			ctx.Next()
 			return
 		}
-		token := ctx.GetHeader("Authorization")
+		header := ctx.GetHeader("Authorization")
 
-		if token == "" {
-			ctx.AbortWithStatusJSON(401, gin.H{
-				"error": "unauthorized",
+		if !strings.HasPrefix(header, "Bearer ") {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error": "error.auth.missing_token",
 			})
 			return
 		}
 
+		token := strings.TrimPrefix(header, "Bearer ")
+		claims, err := security.ParseToken(token)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error": "error.auth.invalid_token",
+			})
+			return
+		}
+		log.Println("user_id middleware: ", claims.UserId)
+
+		ctx.Set("user_id", claims.UserId)
+		ctx.Set("role", claims.Role)
 		ctx.Next()
 	}
 }
