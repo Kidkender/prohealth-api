@@ -10,14 +10,14 @@ import (
 
 func main() {
 	config.LoadEnv()
-	_, err := database.NewPostgresDB()
+	db, err := database.NewPostgresDB()
 	if err != nil {
 		panic(err)
 	}
 
 	r := gin.Default()
 
-	routes.RegisterRoutes(r)
+	routes.RegisterRoutes(r, db)
 	r.Use(middleware.AuthMiddleware())
 	r.Run(":8080")
 }

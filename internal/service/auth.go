@@ -2,15 +2,14 @@ package service
 
 import (
 	"context"
-	"errors"
 
+	"github.com/kidkender/prohealth-api/internal/apperror"
 	"github.com/kidkender/prohealth-api/internal/dto"
 	"github.com/kidkender/prohealth-api/internal/model"
+	"github.com/kidkender/prohealth-api/internal/security"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
-
-var ErrUserExists = errors.New("error.user_exists")
 
 type AuthService struct {
 	db *gorm.DB
@@ -18,6 +17,11 @@ type AuthService struct {
 
 func NewAuthService(db *gorm.DB) *AuthService {
 	return &AuthService{db: db}
+}
+
+type AuthResult struct {
+	UserId uint   `json:"user_id"`
+	Token  string `json:"token"`
 }
 
 func (s *AuthService) Register(
@@ -33,7 +37,7 @@ func (s *AuthService) Register(
 	}
 
 	if count > 0 {
-		return ErrUserExists
+		return apperror.ErrUserExists
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -66,17 +70,27 @@ func (s *AuthService) Register(
 
 func (s *AuthService) Login(
 	ctx context.Context,
-	req *dto.LoginRequest,
-) (*model.User, error) {
+	req *dto.LoginInput,
+) (*AuthResult, error) {
 	var user model.User
 	err := s.db.Where("email = ?", req.Email).First(&user).Error
+	if err != nil {
+		return nil, apperror.ErrUserNotFound
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		return nil, apperror.ErrInvalidCredentials
+	}
+
+	claims := security.NewClaims(user.ID, user.Role)
+	token, err := security.GenerateToken(claims)
+
 	if err != nil {
 		return nil, err
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		return nil, err
-	}
-
-	return &user, nil
+	return &AuthResult{
+		UserId: user.ID,
+		Token:  token,
+	}, nil
 }
