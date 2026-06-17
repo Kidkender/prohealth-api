@@ -2,10 +2,12 @@ package security
 
 import (
 	"errors"
+	"log"
 	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/kidkender/prohealth-api/internal/apperror"
 	"github.com/kidkender/prohealth-api/internal/model"
 )
 
@@ -39,8 +41,9 @@ func ParseToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(jwtSecret), nil
 	})
-	if err != nil {
-		return nil, err
+	if err != nil || !token.Valid {
+		log.Println("error: ", err)
+		return nil, apperror.ErrInvalidToken
 	}
 	claims, ok := token.Claims.(*Claims)
 	if !ok {

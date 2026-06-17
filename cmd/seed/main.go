@@ -8,7 +8,40 @@ import (
 	"github.com/kidkender/prohealth-api/pkg/database"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+var departments = []model.Department{
+	{Name: "Emergency Department"},
+	{Name: "Obstetrics & Gynecology"},
+	{Name: "Pediatric Department"},
+	{Name: "Cardiology Department"},
+	{Name: "Pulmonology Department"},
+	{Name: "Psychiatry Department"},
+	{Name: "Neurology Department"},
+}
+
+type doctorSeed struct {
+	email      string
+	fullname   string
+	phone      string
+	department string
+}
+
+var doctors = []doctorSeed{
+	{"lisachen@prohealth.com", "Dr. Lisa Chen, MD", "+123-456-7890", "Emergency Department"},
+	{"michaeljohnson@prohealth.com", "Dr. Michael Johnson, MD", "+123-456-7891", "Emergency Department"},
+	{"karenlee@prohealth.com", "Dr. Karen Lee, MD", "+123-456-7892", "Obstetrics & Gynecology"},
+	{"sarahpatel@prohealth.com", "Dr. Sarah Patel, MD", "+123-456-7893", "Pediatric Department"},
+	{"davidnguyen@prohealth.com", "Dr. David Nguyen, MD", "+123-456-7894", "Pediatric Department"},
+	{"susanbones@prohealth.com", "Dr. Susan Bones, MD", "+123-456-7895", "Pediatric Department"},
+	{"jameslee@prohealth.com", "Dr. James Lee, MD", "+123-456-7896", "Cardiology Department"},
+	{"michellekim@prohealth.com", "Dr. Michelle Kim, MD", "+123-456-7897", "Cardiology Department"},
+	{"johnsmith@prohealth.com", "Dr. John Smith, MD", "+123-456-7898", "Pulmonology Department"},
+	{"sarahlee@prohealth.com", "Dr. Sarah Lee, MD, MPH, FAPA", "+123-456-7899", "Psychiatry Department"},
+	{"davidpark@prohealth.com", "Dr. David Park, MD", "+123-456-7900", "Psychiatry Department"},
+	{"mariarodriguez@prohealth.com", "Dr. Maria Rodriguez, MD", "+123-456-7901", "Neurology Department"},
+}
 
 func main() {
 	config.LoadEnv()
@@ -17,35 +50,58 @@ func main() {
 	if err != nil {
 		log.Fatal("failed to connect database: ", err)
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte("Admin@123"), bcrypt.DefaultCost)
-	if err != nil {
-		log.Fatal("failed to hash password: ", err)
-	}
+
 	err = db.Transaction(func(tx *gorm.DB) error {
-
-		admin := model.User{
-			Email:    "admin@prohealth.com",
-			Password: string(hash),
-			Role:     model.RoleAdmin,
-		}
-
-		if err := tx.Create(&admin).Error; err != nil {
-			log.Fatal("failed to create admin: ", err)
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&departments).Error; err != nil {
 			return err
 		}
+		log.Printf("Seeded %d departments", len(departments))
 
-		adminProfile := model.UserDetail{
-			UserId:   admin.ID,
-			Fullname: "Admin",
-			User:     admin,
-		}
-
-		if err := tx.Create(&adminProfile).Error; err != nil {
-			log.Fatal("failed to create admin profile: ", err)
+		var deptRows []model.Department
+		if err := tx.Find(&deptRows).Error; err != nil {
 			return err
 		}
+		deptMap := make(map[string]uint, len(deptRows))
+		for _, d := range deptRows {
+			deptMap[d.Name] = d.ID
+		}
 
-		log.Println("Admin seeded successfully")
+		// Seed admin
+		adminHash, err := bcrypt.GenerateFromPassword([]byte("Admin@123"), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
+		admin := model.User{Email: "admin@prohealth.com", Password: string(adminHash), Role: model.RoleAdmin}
+		if res := tx.Where(model.User{Email: admin.Email}).FirstOrCreate(&admin); res.Error != nil {
+			return res.Error
+		}
+		deptID := deptMap["Khoa Nội"]
+		tx.Where(model.UserDetail{UserId: admin.ID}).FirstOrCreate(&model.UserDetail{
+			UserId: admin.ID, Fullname: "Admin", DepartmentID: &deptID,
+		})
+		log.Println("Admin seeded")
+
+		doctorHash, err := bcrypt.GenerateFromPassword([]byte("Doctor@123"), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
+		for _, d := range doctors {
+			user := model.User{Email: d.email, Password: string(doctorHash), Role: model.RoleDoctor}
+			if res := tx.Where(model.User{Email: d.email}).FirstOrCreate(&user); res.Error != nil {
+				return res.Error
+			}
+			deptID := deptMap[d.department]
+			tx.Where(model.UserDetail{UserId: user.ID}).FirstOrCreate(&model.UserDetail{
+				UserId: user.ID, Fullname: d.fullname, PhoneNumber: d.phone, DepartmentID: &deptID,
+			})
+		}
+		log.Printf("Seeded %d doctors", len(doctors))
+
 		return nil
 	})
+
+	if err != nil {
+		log.Fatal("seed failed: ", err)
+	}
+	log.Println("All seeds completed successfully")
 }

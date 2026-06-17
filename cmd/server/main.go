@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/kidkender/prohealth-api/internal/apperror"
 	"github.com/kidkender/prohealth-api/internal/config"
 	"github.com/kidkender/prohealth-api/internal/middleware"
 	"github.com/kidkender/prohealth-api/pkg/database"
@@ -9,7 +10,8 @@ import (
 )
 
 func main() {
-	config.LoadEnv()
+	cfg := config.LoadEnv()
+	apperror.RegisterValidatorTagName()
 	db, err := database.NewPostgresDB()
 	if err != nil {
 		panic(err)
@@ -17,7 +19,7 @@ func main() {
 
 	r := gin.Default()
 
-	r.Use(middleware.CorsMiddleware())
+	r.Use(middleware.CorsMiddleware(cfg.CORSOrigin))
 	r.Use(middleware.AuthMiddleware())
 
 	routes.RegisterRoutes(r, db)

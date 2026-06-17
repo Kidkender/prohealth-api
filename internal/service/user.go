@@ -1,7 +1,8 @@
 package service
 
 import (
-	"github.com/gin-gonic/gin"
+	"context"
+
 	"github.com/kidkender/prohealth-api/internal/apperror"
 	"github.com/kidkender/prohealth-api/internal/model"
 	"gorm.io/gorm"
@@ -21,15 +22,15 @@ type UserResult struct {
 	Role string `json:"role"`
 }
 
-func (s *UserService) GetUser(c *gin.Context, userId uint) (*UserResult, error) {
+func (s *UserService) GetUser(ctx context.Context, userId uint) (*UserResult, error) {
 	var userDetail model.UserDetail
 	var user model.User
 
-	if err := s.db.Where("id = ?", userId).First(&user).Error; err != nil {
+	if err := s.db.WithContext(ctx).Where("id = ?", userId).First(&user).Error; err != nil {
 		return nil, apperror.ErrUserNotFound
 	}
 
-	if err := s.db.Where("user_id = ?", userId).First(&userDetail).Error; err != nil {
+	if err := s.db.WithContext(ctx).Where("user_id = ?", userId).First(&userDetail).Error; err != nil {
 		return nil, apperror.ErrUserDetailNotFound
 	}
 	return &UserResult{
