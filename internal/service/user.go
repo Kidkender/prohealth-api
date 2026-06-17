@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"github.com/kidkender/prohealth-api/internal/apperror"
 	"github.com/kidkender/prohealth-api/internal/model"
@@ -27,11 +28,17 @@ func (s *UserService) GetUser(ctx context.Context, userId uint) (*UserResult, er
 	var user model.User
 
 	if err := s.db.WithContext(ctx).Where("id = ?", userId).First(&user).Error; err != nil {
-		return nil, apperror.ErrUserNotFound
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperror.ErrUserNotFound
+		}
+		return nil, err
 	}
 
 	if err := s.db.WithContext(ctx).Where("user_id = ?", userId).First(&userDetail).Error; err != nil {
-		return nil, apperror.ErrUserDetailNotFound
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperror.ErrUserDetailNotFound
+		}
+		return nil, err
 	}
 	return &UserResult{
 		ID:   userId,

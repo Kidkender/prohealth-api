@@ -1,9 +1,12 @@
 package handler
 
-import "github.com/gin-gonic/gin"
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/kidkender/prohealth-api/internal/response"
+)
 
 func HealthCheck(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"status": "ok",
-	})
+	c.JSON(http.StatusOK, response.Done())
 }

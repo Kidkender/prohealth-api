@@ -31,6 +31,10 @@ func NewClaims(user_id uint, role model.UserRole) *Claims {
 
 func GenerateToken(claim *Claims) (string, error) {
 	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		return "", errors.New("JWT_SECRET not set")
+	}
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claim)
 	tokenString, err := token.SignedString([]byte(jwtSecret))
 	return tokenString, err
@@ -38,6 +42,10 @@ func GenerateToken(claim *Claims) (string, error) {
 
 func ParseToken(tokenString string) (*Claims, error) {
 	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		return nil, errors.New("JWT_SECRET not set")
+	}
+
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(jwtSecret), nil
 	})

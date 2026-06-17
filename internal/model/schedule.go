@@ -51,5 +51,6 @@ type ScheduleShiftDoctor struct {
 	ShiftID uint `gorm:"primaryKey"`
 	UserID  uint `gorm:"primaryKey"`
 
-	User User `gorm:"foreignKey:UserID"`
+	User       User       `gorm:"foreignKey:UserID"`
+	UserDetail UserDetail `gorm:"foreignKey:UserId;references:UserID"`
 }

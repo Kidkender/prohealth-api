@@ -35,30 +35,44 @@ func ToSchedulePeriodResponses(ps []model.SchedulePeriod) []SchedulePeriodRespon
 }
 
 type ScheduleShiftResponse struct {
-	ID           uint      `json:"id"`
-	PeriodID     uint      `json:"period_id"`
-	DepartmentID uint      `json:"department_id"`
-	Date         time.Time `json:"date"`
-	TimeStart    time.Time `json:"time_start"`
-	TimeEnd      time.Time `json:"time_end"`
-	RoomNumber   string    `json:"room_number"`
-	Status       string    `json:"status"`
-	Note         string    `json:"note"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID             uint      `json:"id"`
+	PeriodID       uint      `json:"period_id"`
+	DepartmentID   uint      `json:"department_id"`
+	DepartmentName string    `json:"department_name"`
+	Date           time.Time `json:"date"`
+	TimeStart      time.Time `json:"time_start"`
+	TimeEnd        time.Time `json:"time_end"`
+	RoomNumber     string    `json:"room_number"`
+	Status         string    `json:"status"`
+	Note           string    `json:"note"`
+	Doctors        []string  `json:"doctors"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 func ToScheduleShiftResponse(s model.ScheduleShift) ScheduleShiftResponse {
+	doctors := make([]string, 0, len(s.Doctors))
+	for _, d := range s.Doctors {
+		doctors = append(doctors, d.UserDetail.Fullname)
+	}
+
+	deptName := ""
+	if s.Department.ID != 0 {
+		deptName = s.Department.Name
+	}
+
 	return ScheduleShiftResponse{
-		ID:           s.ID,
-		PeriodID:     s.PeriodID,
-		DepartmentID: s.DepartmentID,
-		Date:         s.Date,
-		TimeStart:    s.TimeStart,
-		TimeEnd:      s.TimeEnd,
-		RoomNumber:   s.RoomNumber,
-		Status:       string(s.Status),
-		Note:         s.Note,
-		CreatedAt:    s.CreatedAt,
+		ID:             s.ID,
+		PeriodID:       s.PeriodID,
+		DepartmentID:   s.DepartmentID,
+		DepartmentName: deptName,
+		Date:           s.Date,
+		TimeStart:      s.TimeStart,
+		TimeEnd:        s.TimeEnd,
+		RoomNumber:     s.RoomNumber,
+		Status:         string(s.Status),
+		Note:           s.Note,
+		Doctors:        doctors,
+		CreatedAt:      s.CreatedAt,
 	}
 }
 

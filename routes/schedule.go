@@ -19,7 +19,10 @@ func RegisterScheduleRoutes(router gin.IRouter, scheduleHandler *handler.Schedul
 		middleware.RequireRole(model.RoleAdmin),
 		scheduleHandler.UpdatePeriod,
 	)
-
+	schedule.DELETE("/period/:id",
+		middleware.RequireRole(model.RoleAdmin),
+		scheduleHandler.DeleteSchedulePeriod,
+	)
 	schedule.GET("/shift", scheduleHandler.GetAllShifts)
 	schedule.GET("/shift/:id", scheduleHandler.GetScheduleShiftByID)
 	schedule.GET("/period/:id/shift", scheduleHandler.GetShiftsByPeriod)
@@ -30,5 +33,10 @@ func RegisterScheduleRoutes(router gin.IRouter, scheduleHandler *handler.Schedul
 	schedule.PUT("/shift/doctor",
 		middleware.RequireRole(model.RoleAdmin),
 		scheduleHandler.SetDoctorShift,
+	)
+
+	schedule.DELETE("/shift/:id",
+		middleware.RequireRole(model.RoleAdmin),
+		scheduleHandler.DeleteScheduleShift,
 	)
 }

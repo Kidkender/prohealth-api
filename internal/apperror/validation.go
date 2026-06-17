@@ -38,8 +38,9 @@ func ValidationError(c *gin.Context, err error) {
 	var timeErr *time.ParseError
 	if errors.As(err, &timeErr) {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":  "error.validate.failed",
-			"fields": map[string]string{"date_field": "invalid_format"},
+			"error":   "error.validate.failed",
+			"fields":  map[string]string{"date_field": "invalid_format"},
+			"message": "invalid date format, expected: YYYY-MM-DDTHH:MM:SSZ",
 		})
 		return
 	}

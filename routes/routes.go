@@ -16,9 +16,12 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	userHandler := handler.NewUserHandler(userService)
 	scheduleService := service.NewScheduleService(db)
 	scheduleHandler := handler.NewScheduleHandler(scheduleService)
+	appointmentService := service.NewAppointmentService(db)
+	appointmentHandler := handler.NewAppointmentHandler(appointmentService)
 
 	api.GET("/health", handler.HealthCheck)
 	RegisterAuthRoutes(api, authHandler)
 	RegisterUserRoutes(api, userHandler)
 	RegisterScheduleRoutes(api, scheduleHandler)
+	RegisterAppointmentRoutes(api, appointmentHandler)
 }

@@ -16,9 +16,7 @@ type ScheduleHandler struct {
 }
 
 func NewScheduleHandler(scheduleService *service.ScheduleService) *ScheduleHandler {
-	return &ScheduleHandler{
-		scheduleService: scheduleService,
-	}
+	return &ScheduleHandler{scheduleService: scheduleService}
 }
 
 func (h *ScheduleHandler) CreatePeriod(c *gin.Context) {
@@ -27,15 +25,11 @@ func (h *ScheduleHandler) CreatePeriod(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
-
-	err := h.scheduleService.CreateSchedulePeriod(c, req)
-	if err != nil {
+	if err := h.scheduleService.CreateSchedulePeriod(c, req); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{
-		"success": "ok",
-	})
+	c.JSON(http.StatusCreated, response.Done())
 }
 
 func (h *ScheduleHandler) CreateShift(c *gin.Context) {
@@ -44,15 +38,11 @@ func (h *ScheduleHandler) CreateShift(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
-
-	err := h.scheduleService.CreateScheduleShift(c, req)
-	if err != nil {
+	if err := h.scheduleService.CreateScheduleShift(c, req); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{
-		"success": "ok",
-	})
+	c.JSON(http.StatusCreated, response.Done())
 }
 
 func (h *ScheduleHandler) SetDoctorShift(c *gin.Context) {
@@ -61,15 +51,11 @@ func (h *ScheduleHandler) SetDoctorShift(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
-
-	err := h.scheduleService.SetDoctorForShift(c, req)
-	if err != nil {
+	if err := h.scheduleService.SetDoctorForShift(c, req); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": "ok",
-	})
+	c.JSON(http.StatusOK, response.Done())
 }
 
 func (h *ScheduleHandler) UpdatePeriod(c *gin.Context) {
@@ -77,20 +63,16 @@ func (h *ScheduleHandler) UpdatePeriod(c *gin.Context) {
 	if !ok {
 		return
 	}
-
 	var req dto.UpdateSchedulePeriodInput
 	if err := c.ShouldBindJSON(&req); err != nil {
 		apperror.ValidationError(c, err)
 		return
 	}
-
 	if err := h.scheduleService.UpdateSchedulePeriod(c, uint(id), req); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": "ok",
-	})
+	c.JSON(http.StatusOK, response.Done())
 }
 
 func (h *ScheduleHandler) GetSchedulePeriods(c *gin.Context) {
@@ -99,23 +81,19 @@ func (h *ScheduleHandler) GetSchedulePeriods(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
-
 	filter.Normalize()
 	if err := filter.Validate(); err != nil {
 		apperror.ValidationError(c, err)
 		return
 	}
-
 	periods, total, err := h.scheduleService.GetSchedulePeriods(c, filter)
 	if err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
-	c.JSON(
-		http.StatusOK,
-		response.NewPaginatedResponse(
-			response.ToSchedulePeriodResponses(periods), total, filter.Page, filter.Limit),
-	)
+	c.JSON(http.StatusOK, response.Paginated(
+		response.ToSchedulePeriodResponses(periods), total, filter.Page, filter.Limit,
+	))
 }
 
 func (h *ScheduleHandler) GetSchedulePeriodById(c *gin.Context) {
@@ -128,7 +106,7 @@ func (h *ScheduleHandler) GetSchedulePeriodById(c *gin.Context) {
 		apperror.HandleError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, response.ToSchedulePeriodResponse(*period))
+	c.JSON(http.StatusOK, response.Ok(response.ToSchedulePeriodResponse(*period)))
 }
 
 func (h *ScheduleHandler) GetAllShifts(c *gin.Context) {
@@ -138,7 +116,6 @@ func (h *ScheduleHandler) GetAllShifts(c *gin.Context) {
 		return
 	}
 	filter.Normalize()
-
 	if err := filter.Validate(); err != nil {
 		apperror.HandleError(c, err)
 		return
@@ -148,10 +125,9 @@ func (h *ScheduleHandler) GetAllShifts(c *gin.Context) {
 		apperror.HandleError(c, err)
 		return
 	}
-	c.JSON(
-		http.StatusOK,
-		response.NewPaginatedResponse(shifts, total, filter.Page, filter.Limit),
-	)
+	c.JSON(http.StatusOK, response.Paginated(
+		response.ToScheduleShiftResponses(shifts), total, filter.Page, filter.Limit,
+	))
 }
 
 func (h *ScheduleHandler) GetShiftsByPeriod(c *gin.Context) {
@@ -164,10 +140,7 @@ func (h *ScheduleHandler) GetShiftsByPeriod(c *gin.Context) {
 		apperror.HandleError(c, err)
 		return
 	}
-	c.JSON(
-		http.StatusOK,
-		response.ToScheduleShiftResponses(shifts),
-	)
+	c.JSON(http.StatusOK, response.Ok(response.ToScheduleShiftResponses(shifts)))
 }
 
 func (h *ScheduleHandler) GetScheduleShiftByID(c *gin.Context) {
@@ -180,5 +153,29 @@ func (h *ScheduleHandler) GetScheduleShiftByID(c *gin.Context) {
 		apperror.HandleError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, response.ToScheduleShiftResponse(*shift))
+	c.JSON(http.StatusOK, response.Ok(response.ToScheduleShiftResponse(*shift)))
+}
+
+func (h *ScheduleHandler) DeleteSchedulePeriod(c *gin.Context) {
+	id, ok := context.ParseParamUint(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.scheduleService.DeleteSchedulePeriod(c, id); err != nil {
+		apperror.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, response.Done())
+}
+
+func (h *ScheduleHandler) DeleteScheduleShift(c *gin.Context) {
+	id, ok := context.ParseParamUint(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.scheduleService.DeleteScheduleShift(c, id); err != nil {
+		apperror.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, response.Done())
 }

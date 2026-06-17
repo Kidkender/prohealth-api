@@ -191,7 +191,11 @@ func (s *ScheduleService) GetScheduleShifts(ctx context.Context, filter dto.Filt
 
 func (s *ScheduleService) GetScheduleShiftsByPeriodID(ctx context.Context, periodID uint) ([]model.ScheduleShift, error) {
 	var shifts []model.ScheduleShift
-	if err := s.db.WithContext(ctx).Where("period_id = ?", periodID).Find(&shifts).Error; err != nil {
+	if err := s.db.WithContext(ctx).
+		Where("period_id = ?", periodID).
+		Preload("Department").
+		Preload("Doctors.UserDetail").
+		Find(&shifts).Error; err != nil {
 		return nil, err
 	}
 	return shifts, nil
@@ -206,4 +210,35 @@ func (s *ScheduleService) GetScheduleShiftById(ctx context.Context, id uint) (*m
 		return nil, err
 	}
 	return &shift, nil
+}
+
+func (s *ScheduleService) DeleteSchedulePeriod(ctx context.Context, periodID uint) error {
+	var period model.SchedulePeriod
+
+	if err := s.db.WithContext(ctx).First(&period, periodID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperror.ErrSchedulePeriodNotFound
+		}
+		return err
+	}
+
+	var shiftCount int64
+	s.db.Model(&model.ScheduleShift{}).Where("period_id = ?", periodID).Count(&shiftCount)
+	if shiftCount > 0 {
+		return apperror.ErrSchedulePeriodHasShifts
+	}
+
+	return s.db.WithContext(ctx).Delete(&period).Error
+}
+
+func (s *ScheduleService) DeleteScheduleShift(ctx context.Context, shiftID uint) error {
+	var shift model.ScheduleShift
+	if err := s.db.WithContext(ctx).First(&shift, shiftID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperror.ErrScheduleShiftNotFound
+		}
+		return err
+	}
+
+	return s.db.WithContext(ctx).Delete(&shift).Error
 }

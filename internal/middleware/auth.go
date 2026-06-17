@@ -8,17 +8,27 @@ import (
 	"github.com/kidkender/prohealth-api/internal/security"
 )
 
-func AuthMiddleware() gin.HandlerFunc {
+type skipKey struct {
+	method string
+	path   string
+}
 
-	skipPaths := map[string]bool{
-		"/api/v1/auth/register": true,
-		"/api/v1/auth/login":    true,
-		"/api/v1/health":        true,
+func AuthMiddleware() gin.HandlerFunc {
+	skipRoutes := map[skipKey]bool{
+		{http.MethodPost, "/api/v1/auth/register"}: true,
+		{http.MethodPost, "/api/v1/auth/login"}:    true,
+		{http.MethodGet, "/api/v1/health"}:         true,
+		// Public schedule browsing (patients don't need to log in to view slots)
+		{http.MethodGet, "/api/v1/schedule/period"}:            true,
+		{http.MethodGet, "/api/v1/schedule/period/:id/shift"}:  true,
+		// Public appointment booking
+		{http.MethodPost, "/api/v1/appointments/"}: true,
 	}
 
 	return func(ctx *gin.Context) {
 
-		if skipPaths[ctx.FullPath()] {
+		key := skipKey{method: ctx.Request.Method, path: ctx.FullPath()}
+		if skipRoutes[key] {
 			ctx.Next()
 			return
 		}
