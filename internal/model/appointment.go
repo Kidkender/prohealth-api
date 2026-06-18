@@ -21,7 +21,7 @@ type Appointment struct {
 	ShiftID         uint              `gorm:"not null"`
 	PatientName     string            `gorm:"not null"`
 	PatientPhone    string
-	AppointmentTime time.Time         `gorm:"type:time;not null"`
+	AppointmentTime string            `gorm:"type:varchar(8);not null"`
 	Reason          AppointmentReason `gorm:"not null;default:'newPatientVisit'"`
 	Status          AppointmentStatus `gorm:"not null;default:'pending'"`
 	Notes           string

@@ -51,3 +51,15 @@ type FilterScheduleShift struct {
 	RoomNumber   *string            `form:"room_number" `
 	Status       *model.ShiftStatus `form:"status" `
 }
+
+type GenerateScheduleInput struct {
+	StartDate *time.Time `json:"start_date"`
+	StartTime string     `json:"start_time" binding:"required"`
+	EndTime   string     `json:"end_time" binding:"required"`
+}
+
+type GenerateScheduleResponse struct {
+	PeriodID      uint   `json:"period_id"`
+	PeriodName    string `json:"period_name"`
+	ShiftsCreated int    `json:"shifts_created"`
+}

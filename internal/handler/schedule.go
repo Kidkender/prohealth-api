@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -178,4 +179,23 @@ func (h *ScheduleHandler) DeleteScheduleShift(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, response.Done())
+}
+
+func (h *ScheduleHandler) GenerateSchedule(c *gin.Context) {
+	var req dto.GenerateScheduleInput
+	slog.Info("GenerateSchedule", "req", req)
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		apperror.ValidationError(c, err)
+		slog.Error("GenerateSchedule", "err", err)
+		return
+	}
+	slog.Info("GenerateSchedule 2", "req", req)
+	result, err := h.scheduleService.GenerateSchedule(c, req)
+	if err != nil {
+		apperror.HandleError(c, err)
+		slog.Error("GenerateSchedule 2", "err", err)
+		return
+	}
+	c.JSON(http.StatusOK, response.Ok(result))
 }

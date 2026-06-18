@@ -40,8 +40,8 @@ type ScheduleShiftResponse struct {
 	DepartmentID   uint      `json:"department_id"`
 	DepartmentName string    `json:"department_name"`
 	Date           time.Time `json:"date"`
-	TimeStart      time.Time `json:"time_start"`
-	TimeEnd        time.Time `json:"time_end"`
+	TimeStart      string    `json:"time_start"`
+	TimeEnd        string    `json:"time_end"`
 	RoomNumber     string    `json:"room_number"`
 	Status         string    `json:"status"`
 	Note           string    `json:"note"`

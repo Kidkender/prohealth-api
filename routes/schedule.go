@@ -39,4 +39,9 @@ func RegisterScheduleRoutes(router gin.IRouter, scheduleHandler *handler.Schedul
 		middleware.RequireRole(model.RoleAdmin),
 		scheduleHandler.DeleteScheduleShift,
 	)
+
+	schedule.POST("/generate",
+		middleware.RequireRole(model.RoleAdmin),
+		scheduleHandler.GenerateSchedule,
+	)
 }

@@ -33,8 +33,8 @@ type ScheduleShift struct {
 	PeriodID     uint        `gorm:"not null"`
 	DepartmentID uint        `gorm:"not null"`
 	Date         time.Time   `gorm:"type:date;not null"`
-	TimeStart    time.Time   `gorm:"type:time;not null"`
-	TimeEnd      time.Time   `gorm:"type:time;not null"`
+	TimeStart    string      `gorm:"type:varchar(5);not null"`
+	TimeEnd      string      `gorm:"type:varchar(5);not null"`
 	RoomNumber   string
 	Status       ShiftStatus `gorm:"not null;default:'scheduled'"`
 	Note         string

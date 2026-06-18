@@ -3,16 +3,22 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math/rand"
+	"sync"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/kidkender/prohealth-api/internal/apperror"
 	"github.com/kidkender/prohealth-api/internal/dto"
 	"github.com/kidkender/prohealth-api/internal/model"
+	"github.com/kidkender/prohealth-api/internal/timeutil"
 	"gorm.io/gorm"
 )
 
 type ScheduleService struct {
-	db *gorm.DB
+	db         *gorm.DB
+	generateMu sync.Mutex
 }
 
 func NewScheduleService(db *gorm.DB) *ScheduleService {
@@ -58,8 +64,8 @@ func (s *ScheduleService) CreateScheduleShift(ctx context.Context, payload dto.C
 		PeriodID:     payload.PeriodID,
 		DepartmentID: payload.DepartmentID,
 		Date:         payload.Date,
-		TimeStart:    payload.StartTime,
-		TimeEnd:      payload.EndTime,
+		TimeStart:    payload.StartTime.Format("15:04"),
+		TimeEnd:      payload.EndTime.Format("15:04"),
 		RoomNumber:   payload.RoomNumber,
 		Status:       payload.Status,
 	}
@@ -241,4 +247,161 @@ func (s *ScheduleService) DeleteScheduleShift(ctx context.Context, shiftID uint)
 	}
 
 	return s.db.WithContext(ctx).Delete(&shift).Error
+}
+
+func (s *ScheduleService) GenerateSchedule(
+	ctx context.Context, payload dto.GenerateScheduleInput,
+) (*dto.GenerateScheduleResponse, error) {
+	s.generateMu.Lock()
+	defer s.generateMu.Unlock()
+
+	monday := timeutil.NextMonday(payload.StartDate)
+	friday := monday.AddDate(0, 0, 4)
+	var count int64
+
+	timeStart, err := time.Parse("15:04", payload.StartTime)
+	if err != nil {
+		return nil, fmt.Errorf("invalid start time: %w", err)
+	}
+	timeEnd, err := time.Parse("15:04", payload.EndTime)
+	if err != nil {
+		return nil, fmt.Errorf("invalid end time: %w", err)
+	}
+
+	if !timeEnd.After(timeStart) {
+		return nil, fmt.Errorf("start time must be before end time")
+	}
+
+	var period model.SchedulePeriod
+
+	shiftsCreated := 0
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+
+		if err := tx.WithContext(ctx).
+			Model(&model.SchedulePeriod{}).
+			Where("start_date = ? AND status = ?", monday, model.PeriodPublished).
+			Count(&count).Error; err != nil {
+			return err
+		}
+
+		if count > 0 {
+			return apperror.ErrSchedulePeriodAlreadyExists
+		}
+
+		period = model.SchedulePeriod{
+			Name:      fmt.Sprintf("Week %s - %s", monday.Format("Jan 2"), friday.Format("Jan 2, 2006")),
+			StartDate: monday,
+			EndDate:   friday,
+			Status:    model.PeriodPublished,
+		}
+		if err := tx.WithContext(ctx).Create(&period).Error; err != nil {
+			return err
+		}
+
+		const maxShiftsPerWeek = 3
+		const maxDeptsPerSlot = 2
+
+		slotDeptCount := map[string]int{}
+		doctorDayAssigned := map[string]map[uint]bool{}
+
+		var depts []model.Department
+		if err := tx.WithContext(ctx).
+			Joins("JOIN user_details ON user_details.department_id = departments.id").
+			Joins("JOIN users ON users.id = user_details.user_id").
+			Where("users.role = ?", model.RoleDoctor).
+			Group("departments.id").
+			Find(&depts).Error; err != nil {
+			return err
+		}
+
+		for deptIdx, dept := range depts {
+			var userDetails []model.UserDetail
+			if err := tx.WithContext(ctx).
+				Joins("JOIN users ON users.id = user_details.user_id").
+				Where("user_details.department_id = ? AND users.role = ?", dept.ID, model.RoleDoctor).
+				Find(&userDetails).Error; err != nil {
+				return err
+			}
+
+			roomNumber := fmt.Sprintf("Room %d%02d", deptIdx/3+1, deptIdx%3+1)
+			subShifts := timeutil.SplitTimeRangeBalanced(timeStart, timeEnd)
+
+			type slot struct {
+				date time.Time
+				sub  [2]time.Time
+			}
+			numWorkDays := 2 + rand.Intn(2)
+			dayIndices := rand.Perm(5)[:numWorkDays]
+
+			allSlots := make([]slot, 0, numWorkDays*len(subShifts))
+			for _, dayIdx := range dayIndices {
+				for _, sub := range subShifts {
+					allSlots = append(allSlots, slot{monday.AddDate(0, 0, dayIdx), sub})
+				}
+			}
+			rand.Shuffle(len(allSlots), func(i, j int) {
+				allSlots[i], allSlots[j] = allSlots[j], allSlots[i]
+			})
+
+			doctorWeekCount := make(map[uint]int, len(userDetails))
+			doctorIdx := 0
+
+			for _, s := range allSlots {
+				slotKey := s.date.Format("2006-01-02") + "|" + s.sub[0].Format("15:04") + "|" + s.sub[1].Format("15:04")
+				if slotDeptCount[slotKey] >= maxDeptsPerSlot {
+					continue
+				}
+
+				dateKey := s.date.Format("2006-01-02")
+				if doctorDayAssigned[dateKey] == nil {
+					doctorDayAssigned[dateKey] = map[uint]bool{}
+				}
+
+				assigned := false
+				for attempt := 0; attempt < len(userDetails); attempt++ {
+					ud := userDetails[doctorIdx%len(userDetails)]
+					doctorIdx++
+					if doctorWeekCount[ud.UserId] < maxShiftsPerWeek && !doctorDayAssigned[dateKey][ud.UserId] {
+						shift := model.ScheduleShift{
+							PeriodID:     period.ID,
+							DepartmentID: dept.ID,
+							Date:         s.date,
+							TimeStart:    s.sub[0].Format("15:04"),
+							TimeEnd:      s.sub[1].Format("15:04"),
+							RoomNumber:   roomNumber,
+							Status:       model.ShiftScheduled,
+						}
+						if err := tx.WithContext(ctx).Create(&shift).Error; err != nil {
+							return err
+						}
+						if err := tx.WithContext(ctx).Create(&model.ScheduleShiftDoctor{
+							ShiftID: shift.ID,
+							UserID:  ud.UserId,
+						}).Error; err != nil {
+							return err
+						}
+						doctorWeekCount[ud.UserId]++
+						doctorDayAssigned[dateKey][ud.UserId] = true
+						slotDeptCount[slotKey]++
+						shiftsCreated++
+						assigned = true
+						break
+					}
+				}
+				if !assigned {
+					continue
+				}
+			}
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return &dto.GenerateScheduleResponse{
+		PeriodID:      period.ID,
+		PeriodName:    period.Name,
+		ShiftsCreated: shiftsCreated,
+	}, nil
+
 }

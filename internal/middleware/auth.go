@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kidkender/prohealth-api/internal/apperror"
 	"github.com/kidkender/prohealth-api/internal/security"
 )
 
@@ -15,14 +16,12 @@ type skipKey struct {
 
 func AuthMiddleware() gin.HandlerFunc {
 	skipRoutes := map[skipKey]bool{
-		{http.MethodPost, "/api/v1/auth/register"}: true,
-		{http.MethodPost, "/api/v1/auth/login"}:    true,
-		{http.MethodGet, "/api/v1/health"}:         true,
-		// Public schedule browsing (patients don't need to log in to view slots)
-		{http.MethodGet, "/api/v1/schedule/period"}:            true,
-		{http.MethodGet, "/api/v1/schedule/period/:id/shift"}:  true,
-		// Public appointment booking
-		{http.MethodPost, "/api/v1/appointments/"}: true,
+		{http.MethodPost, "/api/v1/auth/register"}:            true,
+		{http.MethodPost, "/api/v1/auth/login"}:               true,
+		{http.MethodGet, "/api/v1/health"}:                    true,
+		{http.MethodGet, "/api/v1/schedule/period"}:           true,
+		{http.MethodGet, "/api/v1/schedule/period/:id/shift"}: true,
+		{http.MethodPost, "/api/v1/appointments/"}:            true,
 	}
 
 	return func(ctx *gin.Context) {
@@ -45,7 +44,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		claims, err := security.ParseToken(token)
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "error.auth.invalid_token",
+				"error": apperror.ErrInvalidToken,
 			})
 			return
 		}

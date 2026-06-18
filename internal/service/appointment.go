@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/kidkender/prohealth-api/internal/apperror"
@@ -13,14 +14,15 @@ import (
 )
 
 type AppointmentResult struct {
-	ID              uint      `json:"id"`
-	ShiftID         uint      `json:"shift_id"`
-	PatientName     string    `json:"patient_name"`
-	PatientPhone    string    `json:"patient_phone"`
-	AppointmentTime time.Time `json:"appointment_time"`
-	Reason          string    `json:"reason"`
-	Status          string    `json:"status"`
-	Notes           string    `json:"notes"`
+	ID              uint   `json:"id"`
+	ShiftID         uint   `json:"shift_id"`
+	ShiftDate       string `json:"shift_date"`
+	PatientName     string `json:"patient_name"`
+	PatientPhone    string `json:"patient_phone"`
+	AppointmentTime string `json:"appointment_time"`
+	Reason          string `json:"reason"`
+	Status          string `json:"status"`
+	Notes           string `json:"notes"`
 }
 
 type AppointmentService struct {
@@ -73,6 +75,7 @@ func (s *AppointmentService) GetAppointments(ctx context.Context, filter dto.Fil
 		Order("created_at desc").
 		Limit(filter.Limit).
 		Offset(filter.Offset()).
+		Preload("Shift").
 		Find(&appointments).Error; err != nil {
 		return nil, 0, err
 	}
@@ -82,6 +85,7 @@ func (s *AppointmentService) GetAppointments(ctx context.Context, filter dto.Fil
 		results = append(results, AppointmentResult{
 			ID:              appointment.ID,
 			ShiftID:         appointment.ShiftID,
+			ShiftDate:       appointment.Shift.Date.Format("2006-01-02"),
 			PatientName:     appointment.PatientName,
 			PatientPhone:    appointment.PatientPhone,
 			AppointmentTime: appointment.AppointmentTime,
@@ -94,6 +98,8 @@ func (s *AppointmentService) GetAppointments(ctx context.Context, filter dto.Fil
 }
 
 func (s *AppointmentService) GetAppointmentDoctor(ctx context.Context, doctorID uint, filter *dto.FilterAppointmentDoctor) ([]AppointmentResult, error) {
+	slog.Info("GetAppointmentDoctor", "doctorID", doctorID)
+
 	if err := s.db.WithContext(ctx).First(&model.User{}, doctorID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperror.ErrUserNotFound
@@ -109,13 +115,16 @@ func (s *AppointmentService) GetAppointmentDoctor(ctx context.Context, doctorID 
 		to = filter.To.Add(24 * time.Hour)
 	}
 
+	slog.Info("GetAppointmentDoctor", "from", from, "to", to)
+
 	query := s.db.WithContext(ctx).
 		Joins("JOIN schedule_shift_doctors ON schedule_shift_doctors.shift_id = appointments.shift_id").
+		Joins("JOIN schedule_shifts ON schedule_shifts.id = appointments.shift_id").
 		Where("schedule_shift_doctors.user_id = ?", doctorID).
-		Where("appointments.appointment_time >= ? AND appointments.appointment_time < ?", from, to)
+		Where("schedule_shifts.date >= ? AND schedule_shifts.date < ?", from, to)
 
 	var appointments []model.Appointment
-	if err := query.Find(&appointments).Error; err != nil {
+	if err := query.Preload("Shift").Find(&appointments).Error; err != nil {
 		return nil, err
 	}
 
@@ -124,6 +133,7 @@ func (s *AppointmentService) GetAppointmentDoctor(ctx context.Context, doctorID 
 		result = append(result, AppointmentResult{
 			ID:              appointment.ID,
 			ShiftID:         appointment.ShiftID,
+			ShiftDate:       appointment.Shift.Date.Format("2006-01-02"),
 			PatientName:     appointment.PatientName,
 			PatientPhone:    appointment.PatientPhone,
 			AppointmentTime: appointment.AppointmentTime,
