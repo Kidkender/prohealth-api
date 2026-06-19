@@ -117,7 +117,7 @@ func (s *ScheduleService) UpdateSchedulePeriod(ctx context.Context, id uint, pay
 func (s *ScheduleService) GetSchedulePeriods(ctx context.Context, filter dto.FilterSchedulePeriod) ([]model.SchedulePeriod, int64, error) {
 	var periods []model.SchedulePeriod
 	var total int64
-	query := s.db.Model(&model.SchedulePeriod{})
+	query := s.db.WithContext(ctx).Model(&model.SchedulePeriod{})
 
 	if filter.Status != "" {
 		query = query.Where("status = ?", filter.Status)
@@ -131,7 +131,7 @@ func (s *ScheduleService) GetSchedulePeriods(ctx context.Context, filter dto.Fil
 		query = query.Where("end_date<=?", filter.EndDate)
 	}
 
-	if err := query.Count(&total).Error; err != nil {
+	if err := query.WithContext(ctx).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
@@ -283,7 +283,7 @@ func (s *ScheduleService) GetScheduleShiftByDoctor(ctx context.Context, doctorID
 	query := s.db.WithContext(ctx).
 		Model(&model.ScheduleShift{}).
 		Joins("JOIN schedule_shift_doctors ON schedule_shift_doctors.shift_id = schedule_shifts.id").
-		Where("schedule_shift_doctors.doctor_id = ?", doctorID)
+		Where("schedule_shift_doctors.user_id = ?", doctorID)
 
 	if filter.Date != nil {
 		query = query.Where("date = ?", *filter.Date)

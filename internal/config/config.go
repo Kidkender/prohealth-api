@@ -16,7 +16,10 @@ type Config struct {
 	DBName       string
 	Port         string
 	CORSOrigin   []string
-	ResendAPIKey string
+	SMTPHost     string
+	SMTPPort     string
+	SMTPUsername string
+	SMTPPassword string
 	MailFrom     string
 }
 
@@ -48,7 +51,10 @@ func LoadEnv() *Config {
 		DBName:       requireEnv("DB_NAME"),
 		Port:         requireEnv("PORT"),
 		CORSOrigin:   origins,
-		ResendAPIKey: requireEnv("RESEND_API_KEY"),
+		SMTPHost:     requireEnv("SMTP_HOST"),
+		SMTPPort:     requireEnv("SMTP_PORT"),
+		SMTPUsername: requireEnv("SMTP_USERNAME"),
+		SMTPPassword: requireEnv("SMTP_PASSWORD"),
 		MailFrom:     requireEnv("MAIL_FROM"),
 	}
 }

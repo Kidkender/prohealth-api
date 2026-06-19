@@ -3,7 +3,6 @@ package container
 import (
 	"github.com/kidkender/prohealth-api/internal/config"
 	"github.com/kidkender/prohealth-api/internal/service"
-	"github.com/resend/resend-go/v3"
 	"gorm.io/gorm"
 )
 
@@ -15,8 +14,13 @@ type Container struct {
 }
 
 func New(db *gorm.DB, cfg *config.Config) *Container {
-	resendClient := resend.NewClient(cfg.ResendAPIKey)
-	mailService := service.NewMailService(resendClient, cfg.MailFrom)
+	mailService := service.NewMailService(
+		cfg.SMTPHost,
+		cfg.SMTPPort,
+		cfg.SMTPUsername,
+		cfg.SMTPPassword,
+		cfg.MailFrom,
+	)
 
 	return &Container{
 		AuthService:        service.NewAuthService(db),

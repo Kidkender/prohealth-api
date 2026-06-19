@@ -10,6 +10,7 @@ type CreateAppointmentInput struct {
 	ShiftID         uint                    `json:"shift_id" binding:"required"`
 	PatientName     string                  `json:"patient_name" binding:"required"`
 	PatientPhone    string                  `json:"patient_phone" binding:"required"`
+	PatientEmail    string                  `json:"patient_email" binding:"required"`
 	AppointmentTime string                  `json:"time" binding:"required"`
 	Reason          model.AppointmentReason `json:"reason" binding:"required"`
 }

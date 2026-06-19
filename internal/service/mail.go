@@ -5,18 +5,27 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"net/smtp"
 
 	tmpl "github.com/kidkender/prohealth-api/internal/template"
-	"github.com/resend/resend-go/v3"
 )
 
 type MailService struct {
-	client *resend.Client
-	from   string
+	host     string
+	port     string
+	username string
+	password string
+	from     string
 }
 
-func NewMailService(client *resend.Client, from string) *MailService {
-	return &MailService{client: client, from: from}
+func NewMailService(host, port, username, password, from string) *MailService {
+	return &MailService{
+		host:     host,
+		port:     port,
+		username: username,
+		password: password,
+		from:     from,
+	}
 }
 
 type AppointmentCreatedData struct {
@@ -37,21 +46,21 @@ func (s *MailService) SendAppointmentCreated(ctx context.Context, to string, dat
 		return fmt.Errorf("render template: %w", err)
 	}
 
-	_, err = s.client.Emails.Send(&resend.SendEmailRequest{
-		From:    s.from,
-		To:      []string{to},
-		Subject: "Xác nhận lịch hẹn - ProHealth",
-		Html:    buf.String(),
-	})
-	return err
+	return s.send(to, "Xác nhận lịch hẹn - ProHealth", buf.String())
 }
 
 func (s *MailService) Send(ctx context.Context, to string, subject string, body string) error {
-	_, err := s.client.Emails.Send(&resend.SendEmailRequest{
-		From:    s.from,
-		To:      []string{to},
-		Subject: subject,
-		Html:    body,
-	})
-	return err
+	return s.send(to, subject, body)
+}
+
+func (s *MailService) send(to, subject, body string) error {
+	auth := smtp.PlainAuth("", s.username, s.password, s.host)
+
+	msg := fmt.Sprintf(
+		"From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s",
+		s.from, to, subject, body,
+	)
+
+	addr := fmt.Sprintf("%s:%s", s.host, s.port)
+	return smtp.SendMail(addr, auth, s.from, []string{to}, []byte(msg))
 }

@@ -14,3 +14,5 @@ var ErrDoctorAlreadyAssigned = Conflict("error.schedule.doctor.already_assigned"
 var ErrSchedulePeriodAlreadyExists = Conflict("error.schedule.period.already_exists")
 var ErrSchedulePeriodHasShifts = Conflict("error.schedule.period.has_shifts")
 var ErrAppointmentNotFound = NotFound("error.appointment.not_found")
+var ErrUnauthorized = Unauthorized("error.unauthorized")
+var ErrForbidden = Forbidden("error.forbidden")

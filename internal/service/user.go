@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/kidkender/prohealth-api/internal/apperror"
+	"github.com/kidkender/prohealth-api/internal/dto"
 	"github.com/kidkender/prohealth-api/internal/model"
 	"gorm.io/gorm"
 )
@@ -45,4 +46,19 @@ func (s *UserService) GetUser(ctx context.Context, userId uint) (*UserResult, er
 		Name: userDetail.Fullname,
 		Role: string(user.Role),
 	}, nil
+}
+
+func (s *UserService) AssignRole(ctx context.Context, payload dto.AssignRoleRequest) error {
+	var user model.User
+	if err := s.db.WithContext(ctx).Where("id = ?", payload.UserID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperror.ErrUserNotFound
+		}
+		return err
+	}
+	user.Role = payload.Role
+	if err := s.db.WithContext(ctx).Save(&user).Error; err != nil {
+		return err
+	}
+	return nil
 }

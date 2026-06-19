@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"time"
@@ -40,24 +41,42 @@ func (s *AppointmentService) CreateAppointment(ctx context.Context, payload dto.
 		return err
 	}
 
-	appointment := model.Appointment{
-		ShiftID:         payload.ShiftID,
-		PatientName:     payload.PatientName,
-		PatientPhone:    payload.PatientPhone,
-		AppointmentTime: payload.AppointmentTime,
-		Reason:          payload.Reason,
+	appointmentTime := payload.AppointmentTime
+	if t, err := time.Parse(time.RFC3339, payload.AppointmentTime); err == nil {
+		appointmentTime = t.Format("15:04")
 	}
-	if err := s.db.Create(&appointment).Error; err != nil {
-		return err
-	}
+	return s.db.Transaction(func(tx *gorm.DB) error {
 
-	data := AppointmentCreatedData{
-		PatientName:     payload.PatientName,
-		ShiftDate:       shift.Date.Format("2006-01-02"),
-		AppointmentTime: payload.AppointmentTime,
-		Reason:          string(payload.Reason),
-	}
-	return s.mail.SendAppointmentCreated(ctx, payload.PatientPhone, data)
+		appointment := model.Appointment{
+			ShiftID:         payload.ShiftID,
+			PatientName:     payload.PatientName,
+			PatientPhone:    payload.PatientPhone,
+			PatientEmail:    payload.PatientEmail,
+			AppointmentTime: appointmentTime,
+			Reason:          payload.Reason,
+		}
+		if err := tx.Create(&appointment).Error; err != nil {
+			return err
+		}
+
+		jobPayload, _ := json.Marshal(map[string]string{
+			"to":     payload.PatientEmail,
+			"name":   payload.PatientName,
+			"time":   appointmentTime,
+			"date":   shift.Date.Format("2006-01-02"),
+			"reason": string(payload.Reason),
+		})
+
+		if err := tx.Create(&model.OutboxJob{
+			Type:    string(model.OutboxJobTypeAppointmentCreated),
+			Status:  model.OutboxJobStatusPending,
+			Payload: jobPayload,
+		}).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 func (s *AppointmentService) GetAppointments(ctx context.Context, filter dto.FilterAppointment) ([]AppointmentResult, int64, error) {
@@ -108,7 +127,7 @@ func (s *AppointmentService) GetAppointments(ctx context.Context, filter dto.Fil
 	return results, count, nil
 }
 
-func (s *AppointmentService) UpdateAppointment(ctx context.Context, id uint, payload dto.UpdateAppointmentInput) error {
+func (s *AppointmentService) UpdateAppointment(ctx context.Context, id uint, callerID uint, callerRole model.UserRole, payload dto.UpdateAppointmentInput) error {
 	var appt model.Appointment
 	if err := s.db.WithContext(ctx).First(&appt, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -116,6 +135,19 @@ func (s *AppointmentService) UpdateAppointment(ctx context.Context, id uint, pay
 		}
 		return err
 	}
+
+	if callerRole == model.RoleDoctor {
+		var shift model.ScheduleShift
+		err := s.db.WithContext(ctx).
+			Joins("JOIN schedule_shift_doctors ON schedule_shift_doctors.user_id = schedule_shifts.id").
+			Where("schedule_shift_doctors.user_id = ? AND schedule_shifts.id = ?", callerID, appt.ShiftID).
+			First(&shift).Error
+		if err != nil {
+			return apperror.ErrForbidden
+		}
+
+	}
+
 	if payload.Status != "" {
 		appt.Status = payload.Status
 	}
