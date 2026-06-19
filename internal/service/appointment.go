@@ -26,11 +26,12 @@ type AppointmentResult struct {
 }
 
 type AppointmentService struct {
-	db *gorm.DB
+	db   *gorm.DB
+	mail *MailService
 }
 
-func NewAppointmentService(db *gorm.DB) *AppointmentService {
-	return &AppointmentService{db: db}
+func NewAppointmentService(db *gorm.DB, mail *MailService) *AppointmentService {
+	return &AppointmentService{db: db, mail: mail}
 }
 
 func (s *AppointmentService) CreateAppointment(ctx context.Context, payload dto.CreateAppointmentInput) error {
@@ -46,7 +47,17 @@ func (s *AppointmentService) CreateAppointment(ctx context.Context, payload dto.
 		AppointmentTime: payload.AppointmentTime,
 		Reason:          payload.Reason,
 	}
-	return s.db.Create(&appointment).Error
+	if err := s.db.Create(&appointment).Error; err != nil {
+		return err
+	}
+
+	data := AppointmentCreatedData{
+		PatientName:     payload.PatientName,
+		ShiftDate:       shift.Date.Format("2006-01-02"),
+		AppointmentTime: payload.AppointmentTime,
+		Reason:          string(payload.Reason),
+	}
+	return s.mail.SendAppointmentCreated(ctx, payload.PatientPhone, data)
 }
 
 func (s *AppointmentService) GetAppointments(ctx context.Context, filter dto.FilterAppointment) ([]AppointmentResult, int64, error) {

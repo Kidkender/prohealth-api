@@ -8,14 +8,16 @@ import (
 )
 
 type Config struct {
-	JWTSecret  string
-	DBHost     string
-	DBPort     string
-	DBUser     string
-	DBPassword string
-	DBName     string
-	Port       string
-	CORSOrigin []string
+	JWTSecret    string
+	DBHost       string
+	DBPort       string
+	DBUser       string
+	DBPassword   string
+	DBName       string
+	Port         string
+	CORSOrigin   []string
+	ResendAPIKey string
+	MailFrom     string
 }
 
 func requireEnv(key string) string {
@@ -38,14 +40,16 @@ func LoadEnv() *Config {
 	}
 
 	return &Config{
-		JWTSecret:  requireEnv("JWT_SECRET"),
-		DBHost:     requireEnv("DB_HOST"),
-		DBPort:     requireEnv("DB_PORT"),
-		DBUser:     requireEnv("DB_USER"),
-		DBPassword: requireEnv("DB_PASSWORD"),
-		DBName:     requireEnv("DB_NAME"),
-		Port:       requireEnv("PORT"),
-		CORSOrigin: origins,
+		JWTSecret:    requireEnv("JWT_SECRET"),
+		DBHost:       requireEnv("DB_HOST"),
+		DBPort:       requireEnv("DB_PORT"),
+		DBUser:       requireEnv("DB_USER"),
+		DBPassword:   requireEnv("DB_PASSWORD"),
+		DBName:       requireEnv("DB_NAME"),
+		Port:         requireEnv("PORT"),
+		CORSOrigin:   origins,
+		ResendAPIKey: requireEnv("RESEND_API_KEY"),
+		MailFrom:     requireEnv("MAIL_FROM"),
 	}
 }
 

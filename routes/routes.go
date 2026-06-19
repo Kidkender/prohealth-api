@@ -2,22 +2,17 @@ package routes
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/kidkender/prohealth-api/internal/container"
 	"github.com/kidkender/prohealth-api/internal/handler"
-	"github.com/kidkender/prohealth-api/internal/service"
-	"gorm.io/gorm"
 )
 
-func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
+func RegisterRoutes(r *gin.Engine, c *container.Container) {
 	api := r.Group("/api/v1")
 
-	authService := service.NewAuthService(db)
-	authHandler := handler.NewAuthHandler(authService)
-	userService := service.NewUserService(db)
-	userHandler := handler.NewUserHandler(userService)
-	scheduleService := service.NewScheduleService(db)
-	scheduleHandler := handler.NewScheduleHandler(scheduleService)
-	appointmentService := service.NewAppointmentService(db)
-	appointmentHandler := handler.NewAppointmentHandler(appointmentService)
+	authHandler := handler.NewAuthHandler(c.AuthService)
+	userHandler := handler.NewUserHandler(c.UserService)
+	scheduleHandler := handler.NewScheduleHandler(c.ScheduleService)
+	appointmentHandler := handler.NewAppointmentHandler(c.AppointmentService)
 
 	api.GET("/health", handler.HealthCheck)
 	RegisterAuthRoutes(api, authHandler)

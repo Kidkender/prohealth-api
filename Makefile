@@ -2,6 +2,9 @@
 include .env
 export
 
+migrate-create:
+	migrate create -ext sql -dir db/migrations -seq $(NAME)
+
 migrate-up:
 	migrate -path db/migrations -database "$(DATABASE_URL)" up
 

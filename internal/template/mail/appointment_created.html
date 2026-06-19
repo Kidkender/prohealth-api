@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Xác nhận lịch hẹn</title>
+</head>
+<body style="font-family: Arial, sans-serif; color: #333; padding: 24px;">
+  <h2>Xin chào {{.PatientName}},</h2>
+  <p>Lịch hẹn của bạn đã được đặt thành công.</p>
+
+  <table style="border-collapse: collapse; width: 100%; max-width: 480px;">
+    <tr>
+      <td style="padding: 8px 0; font-weight: bold;">Ngày khám:</td>
+      <td style="padding: 8px 0;">{{.ShiftDate}}</td>
+    </tr>
+    <tr>
+      <td style="padding: 8px 0; font-weight: bold;">Giờ khám:</td>
+      <td style="padding: 8px 0;">{{.AppointmentTime}}</td>
+    </tr>
+    <tr>
+      <td style="padding: 8px 0; font-weight: bold;">Lý do:</td>
+      <td style="padding: 8px 0;">{{.Reason}}</td>
+    </tr>
+  </table>
+
+  <p style="margin-top: 24px;">Nếu bạn cần thay đổi hoặc huỷ lịch, vui lòng liên hệ với chúng tôi.</p>
+  <p>Trân trọng,<br/>ProHealth</p>
+</body>
+</html>

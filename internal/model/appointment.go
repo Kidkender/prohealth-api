@@ -17,10 +17,11 @@ const (
 )
 
 type Appointment struct {
-	ID              uint              `gorm:"primaryKey"`
-	ShiftID         uint              `gorm:"not null"`
-	PatientName     string            `gorm:"not null"`
+	ID              uint   `gorm:"primaryKey"`
+	ShiftID         uint   `gorm:"not null"`
+	PatientName     string `gorm:"not null"`
 	PatientPhone    string
+	PatientEmail    string
 	AppointmentTime string            `gorm:"type:varchar(8);not null"`
 	Reason          AppointmentReason `gorm:"not null;default:'newPatientVisit'"`
 	Status          AppointmentStatus `gorm:"not null;default:'pending'"`
