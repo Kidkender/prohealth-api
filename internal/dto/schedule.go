@@ -29,6 +29,12 @@ type UpdateSchedulePeriodInput struct {
 	EndDate   time.Time          `json:"end_date" binding:"required"`
 }
 
+type UpdateScheduleShiftInput struct {
+	Status     *model.ShiftStatus `json:"status" `
+	RoomNumber *string            `json:"room_number" `
+	Note       *string            `json:"note"`
+}
+
 type SetDoctorForShiftInput struct {
 	ShiftID  uint `json:"shift_id" binding:"required"`
 	DoctorID uint `json:"doctor_id" binding:"required"`

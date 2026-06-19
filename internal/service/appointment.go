@@ -97,6 +97,24 @@ func (s *AppointmentService) GetAppointments(ctx context.Context, filter dto.Fil
 	return results, count, nil
 }
 
+func (s *AppointmentService) UpdateAppointment(ctx context.Context, id uint, payload dto.UpdateAppointmentInput) error {
+	var appt model.Appointment
+	if err := s.db.WithContext(ctx).First(&appt, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperror.ErrAppointmentNotFound
+		}
+		return err
+	}
+	if payload.Status != "" {
+		appt.Status = payload.Status
+	}
+	if payload.Reason != "" {
+		appt.Reason = payload.Reason
+	}
+	appt.Notes = payload.Notes
+	return s.db.WithContext(ctx).Save(&appt).Error
+}
+
 func (s *AppointmentService) GetAppointmentDoctor(ctx context.Context, doctorID uint, filter *dto.FilterAppointmentDoctor) ([]AppointmentResult, error) {
 	slog.Info("GetAppointmentDoctor", "doctorID", doctorID)
 

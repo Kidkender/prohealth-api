@@ -46,6 +46,23 @@ func (h *AppointmentHandler) GetAppointments(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, response.Paginated(appointments, total, query.Page, query.Limit))
 }
 
+func (h *AppointmentHandler) UpdateAppointment(c *gin.Context) {
+	id, ok := context.ParseParamUint(c, "id")
+	if !ok {
+		return
+	}
+	var req dto.UpdateAppointmentInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		apperror.ValidationError(c, err)
+		return
+	}
+	if err := h.appointmentService.UpdateAppointment(c, id, req); err != nil {
+		apperror.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, response.Done())
+}
+
 func (h *AppointmentHandler) GetAppointmentByMe(ctx *gin.Context) {
 	userID := context.UserId(ctx)
 	var filter dto.FilterAppointmentDoctor

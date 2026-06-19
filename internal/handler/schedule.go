@@ -199,3 +199,38 @@ func (h *ScheduleHandler) GenerateSchedule(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, response.Ok(result))
 }
+
+func (h *ScheduleHandler) UpdateScheduleShift(c *gin.Context) {
+	var req dto.UpdateScheduleShiftInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		apperror.ValidationError(c, err)
+		return
+	}
+	id, ok := context.ParseParamUint(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.scheduleService.UpdateScheduleShift(c, uint(id), req); err != nil {
+		apperror.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, response.Done())
+}
+
+func (h *ScheduleHandler) GetScheduleShiftByDoctor(c *gin.Context) {
+	var filter dto.FilterScheduleShift
+	if err := c.ShouldBindQuery(&filter); err != nil {
+		apperror.ValidationError(c, err)
+		return
+	}
+	id, ok := context.ParseParamUint(c, "id")
+	if !ok {
+		return
+	}
+	result, err := h.scheduleService.GetScheduleShiftByDoctor(c, uint(id), &filter)
+	if err != nil {
+		apperror.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, response.Ok(result))
+}

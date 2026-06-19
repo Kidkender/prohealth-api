@@ -249,6 +249,53 @@ func (s *ScheduleService) DeleteScheduleShift(ctx context.Context, shiftID uint)
 	return s.db.WithContext(ctx).Delete(&shift).Error
 }
 
+func (s *ScheduleService) UpdateScheduleShift(ctx context.Context, shiftID uint, payload dto.UpdateScheduleShiftInput) error {
+	updates := map[string]any{}
+
+	if payload.Status != nil {
+		updates["status"] = *payload.Status
+	}
+	if payload.RoomNumber != nil {
+		updates["room_number"] = *payload.RoomNumber
+	}
+	if payload.Note != nil {
+		updates["note"] = *payload.Note
+	}
+
+	result := s.db.WithContext(ctx).
+		Model(&model.ScheduleShift{}).
+		Where("id = ?", shiftID).
+		Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return apperror.ErrScheduleShiftNotFound
+	}
+	return nil
+
+}
+
+func (s *ScheduleService) GetScheduleShiftByDoctor(ctx context.Context, doctorID uint, filter *dto.FilterScheduleShift) (*model.ScheduleShift, error) {
+	var shift model.ScheduleShift
+
+	query := s.db.WithContext(ctx).
+		Model(&model.ScheduleShift{}).
+		Joins("JOIN schedule_shift_doctors ON schedule_shift_doctors.shift_id = schedule_shifts.id").
+		Where("schedule_shift_doctors.doctor_id = ?", doctorID)
+
+	if filter.Date != nil {
+		query = query.Where("date = ?", *filter.Date)
+	}
+
+	result := query.Find(&shift)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return &shift, nil
+}
+
 func (s *ScheduleService) GenerateSchedule(
 	ctx context.Context, payload dto.GenerateScheduleInput,
 ) (*dto.GenerateScheduleResponse, error) {

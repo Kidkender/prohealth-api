@@ -10,4 +10,5 @@ func RegisterAppointmentRoutes(router gin.IRouter, handler *handler.AppointmentH
 	appointment.POST("/", handler.RegisterAppointment)
 	appointment.GET("/", handler.GetAppointments)
 	appointment.GET("/me", handler.GetAppointmentByMe)
+	appointment.PATCH("/:id", handler.UpdateAppointment)
 }
