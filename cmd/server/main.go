@@ -23,5 +23,9 @@ func main() {
 	r.Use(middleware.AuthMiddleware())
 
 	routes.RegisterRoutes(r, db)
-	r.Run(":8080")
+	port := cfg.Port
+	if port == "" {
+		port = "8080"
+	}
+	r.Run(":" + port)
 }
