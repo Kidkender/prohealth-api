@@ -75,9 +75,8 @@ func main() {
 		if res := tx.Where(model.User{Email: admin.Email}).FirstOrCreate(&admin); res.Error != nil {
 			return res.Error
 		}
-		deptID := deptMap["Khoa Nội"]
 		tx.Where(model.UserDetail{UserId: admin.ID}).FirstOrCreate(&model.UserDetail{
-			UserId: admin.ID, Fullname: "Admin", DepartmentID: &deptID,
+			UserId: admin.ID, Fullname: "Admin",
 		})
 		log.Println("Admin seeded")
 
