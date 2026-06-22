@@ -3,6 +3,7 @@ package container
 import (
 	"github.com/kidkender/prohealth-api/internal/config"
 	"github.com/kidkender/prohealth-api/internal/service"
+	"github.com/kidkender/prohealth-api/internal/worker"
 	"gorm.io/gorm"
 )
 
@@ -11,6 +12,7 @@ type Container struct {
 	UserService        *service.UserService
 	ScheduleService    *service.ScheduleService
 	AppointmentService *service.AppointmentService
+	OutboxWorker       *worker.OutboxWorker
 }
 
 func New(db *gorm.DB, cfg *config.Config) *Container {
@@ -27,5 +29,6 @@ func New(db *gorm.DB, cfg *config.Config) *Container {
 		UserService:        service.NewUserService(db),
 		ScheduleService:    service.NewScheduleService(db),
 		AppointmentService: service.NewAppointmentService(db, mailService),
+		OutboxWorker:       worker.NewOutboxWorker(db, mailService),
 	}
 }

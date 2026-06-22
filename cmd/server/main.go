@@ -1,6 +1,12 @@
 package main
 
 import (
+	"context"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/gin-gonic/gin"
 	"github.com/kidkender/prohealth-api/internal/apperror"
 	"github.com/kidkender/prohealth-api/internal/config"
@@ -19,6 +25,12 @@ func main() {
 	}
 
 	c := container.New(db, cfg)
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	log.Println("outbox worker started")
+	go c.OutboxWorker.Run(ctx)
 
 	r := gin.Default()
 	r.Use(middleware.CorsMiddleware(cfg.CORSOrigin))

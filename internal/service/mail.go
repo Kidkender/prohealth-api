@@ -3,8 +3,10 @@ package service
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"html/template"
+	"log/slog"
 	"net/smtp"
 
 	tmpl "github.com/kidkender/prohealth-api/internal/template"
@@ -54,13 +56,42 @@ func (s *MailService) Send(ctx context.Context, to string, subject string, body 
 }
 
 func (s *MailService) send(to, subject, body string) error {
-	auth := smtp.PlainAuth("", s.username, s.password, s.host)
+	addr := fmt.Sprintf("%s:%s", s.host, s.port)
+
+	conn, err := tls.Dial("tcp", addr, &tls.Config{ServerName: s.host})
+	if err != nil {
+		return fmt.Errorf("smtp dial tls: %w", err)
+	}
+
+	client, err := smtp.NewClient(conn, s.host)
+	if err != nil {
+		return fmt.Errorf("smtp new client: %w", err)
+	}
+	defer client.Close()
+
+	if err := client.Auth(smtp.PlainAuth("", s.username, s.password, s.host)); err != nil {
+		return fmt.Errorf("smtp auth: %w", err)
+	}
+	if err := client.Mail(s.from); err != nil {
+		return fmt.Errorf("smtp mail from: %w", err)
+	}
+	if err := client.Rcpt(to); err != nil {
+		return fmt.Errorf("smtp rcpt: %w", err)
+	}
+
+	w, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("smtp data: %w", err)
+	}
 
 	msg := fmt.Sprintf(
 		"From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s",
 		s.from, to, subject, body,
 	)
+	if _, err := fmt.Fprint(w, msg); err != nil {
+		return fmt.Errorf("smtp write: %w", err)
+	}
 
-	addr := fmt.Sprintf("%s:%s", s.host, s.port)
-	return smtp.SendMail(addr, auth, s.from, []string{to}, []byte(msg))
+	slog.Info("send mail success", "to", to)
+	return w.Close()
 }

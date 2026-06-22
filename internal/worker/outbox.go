@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"log/slog"
 	"time"
 
 	"github.com/kidkender/prohealth-api/internal/model"
@@ -33,12 +34,14 @@ func (w *OutboxWorker) Run(ctx context.Context) {
 		case <-ticker.C:
 			w.process(ctx)
 		case <-ctx.Done():
+			log.Println("outbox worker stopped")
 			return
 		}
 	}
 }
 
 func (w *OutboxWorker) process(ctx context.Context) {
+	slog.Info("outbox: tick - checking pending jobs")
 	var jobs []model.OutboxJob
 	if err := w.db.WithContext(ctx).
 		Where("status = ? AND retry_count < ?", model.OutboxJobStatusPending, maxRetry).
@@ -59,11 +62,13 @@ func (w *OutboxWorker) process(ctx context.Context) {
 			})
 			continue
 		}
+		slog.Info("outbox: job completed", "id", job.ID)
 		w.db.WithContext(ctx).Model(&job).Update("status", model.OutboxJobStatusCompleted)
 	}
 }
 
 func (w *OutboxWorker) handle(ctx context.Context, job model.OutboxJob) error {
+
 	switch model.OutboxJobType(job.Type) {
 	case model.OutboxJobTypeAppointmentCreated:
 		return w.handleAppointmentCreated(ctx, job.Payload)

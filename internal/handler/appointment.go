@@ -7,6 +7,7 @@ import (
 	"github.com/kidkender/prohealth-api/internal/apperror"
 	"github.com/kidkender/prohealth-api/internal/context"
 	"github.com/kidkender/prohealth-api/internal/dto"
+	"github.com/kidkender/prohealth-api/internal/model"
 	"github.com/kidkender/prohealth-api/internal/response"
 	"github.com/kidkender/prohealth-api/internal/service"
 )
@@ -56,7 +57,9 @@ func (h *AppointmentHandler) UpdateAppointment(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
-	if err := h.appointmentService.UpdateAppointment(c, id, req); err != nil {
+	callerID := context.UserId(c)
+	callerRole := model.UserRole(context.UserRole(c))
+	if err := h.appointmentService.UpdateAppointment(c, id, callerID, callerRole, req); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
