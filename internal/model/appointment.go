@@ -18,6 +18,7 @@ const (
 
 type Appointment struct {
 	ID              uint   `gorm:"primaryKey"`
+	HospitalID      uint   `gorm:"not null"`
 	ShiftID         uint   `gorm:"not null"`
 	PatientName     string `gorm:"not null"`
 	PatientPhone    string
@@ -27,7 +28,8 @@ type Appointment struct {
 	Status          AppointmentStatus `gorm:"not null;default:'pending'"`
 	Notes           string
 
-	Shift ScheduleShift `gorm:"foreignKey:ShiftID"`
+	Shift    ScheduleShift `gorm:"foreignKey:ShiftID"`
+	Hospital Hospital      `gorm:"foreignKey:HospitalID"`
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

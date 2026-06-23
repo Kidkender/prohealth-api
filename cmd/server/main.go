@@ -35,6 +35,7 @@ func main() {
 	r := gin.Default()
 	r.Use(middleware.CorsMiddleware(cfg.CORSOrigin))
 	r.Use(middleware.AuthMiddleware())
+	r.Use(middleware.TenantMiddleware(db))
 
 	routes.RegisterRoutes(r, c)
 	port := cfg.Port

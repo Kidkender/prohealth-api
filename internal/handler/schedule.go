@@ -26,7 +26,7 @@ func (h *ScheduleHandler) CreatePeriod(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
-	if err := h.scheduleService.CreateSchedulePeriod(c, req); err != nil {
+	if err := h.scheduleService.CreateSchedulePeriod(c, context.HospitalId(c), req); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
@@ -39,7 +39,7 @@ func (h *ScheduleHandler) CreateShift(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
-	if err := h.scheduleService.CreateScheduleShift(c, req); err != nil {
+	if err := h.scheduleService.CreateScheduleShift(c, context.HospitalId(c), req); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
@@ -87,7 +87,7 @@ func (h *ScheduleHandler) GetSchedulePeriods(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
-	periods, total, err := h.scheduleService.GetSchedulePeriods(c, filter)
+	periods, total, err := h.scheduleService.GetSchedulePeriods(c, context.HospitalId(c), filter)
 	if err != nil {
 		apperror.HandleError(c, err)
 		return
@@ -121,7 +121,7 @@ func (h *ScheduleHandler) GetAllShifts(c *gin.Context) {
 		apperror.HandleError(c, err)
 		return
 	}
-	shifts, total, err := h.scheduleService.GetScheduleShifts(c, filter)
+	shifts, total, err := h.scheduleService.GetScheduleShifts(c, context.HospitalId(c), filter)
 	if err != nil {
 		apperror.HandleError(c, err)
 		return
@@ -191,7 +191,7 @@ func (h *ScheduleHandler) GenerateSchedule(c *gin.Context) {
 		return
 	}
 	slog.Info("GenerateSchedule 2", "req", req)
-	result, err := h.scheduleService.GenerateSchedule(c, req)
+	result, err := h.scheduleService.GenerateSchedule(c, context.HospitalId(c), req)
 	if err != nil {
 		apperror.HandleError(c, err)
 		slog.Error("GenerateSchedule 2", "err", err)
@@ -227,7 +227,7 @@ func (h *ScheduleHandler) GetScheduleShiftByDoctor(c *gin.Context) {
 	if !ok {
 		return
 	}
-	result, err := h.scheduleService.GetScheduleShiftByDoctor(c, uint(id), &filter)
+	result, err := h.scheduleService.GetScheduleShiftByDoctor(c, context.HospitalId(c), uint(id), &filter)
 	if err != nil {
 		apperror.HandleError(c, err)
 		return

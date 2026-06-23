@@ -6,6 +6,10 @@ func UserId(c *gin.Context) uint {
 	return c.MustGet("user_id").(uint)
 }
 
+func HospitalId(c *gin.Context) uint {
+	return c.MustGet("hospital_id").(uint)
+}
+
 func UserRole(c *gin.Context) string {
 	return c.GetString("role")
 }

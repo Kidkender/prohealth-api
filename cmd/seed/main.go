@@ -52,6 +52,7 @@ func main() {
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
+		// Seed departments
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&departments).Error; err != nil {
 			return err
 		}
@@ -66,26 +67,45 @@ func main() {
 			deptMap[d.Name] = d.ID
 		}
 
+		// Seed default hospital
+		hospital := model.Hospital{
+			Name:        "ProHealth General Hospital",
+			Slug:        "prohealth-general",
+			Description: "Default hospital",
+			Address:     "123 Medical Street",
+		}
+		if err := tx.Where(model.Hospital{Slug: hospital.Slug}).FirstOrCreate(&hospital).Error; err != nil {
+			return err
+		}
+		log.Println("Hospital seeded, ID:", hospital.ID)
+
 		// Seed admin
 		adminHash, err := bcrypt.GenerateFromPassword([]byte("Admin@123"), bcrypt.DefaultCost)
 		if err != nil {
 			return err
 		}
-		admin := model.User{Email: "admin@prohealth.com", Password: string(adminHash), Role: model.RoleAdmin}
+		admin := model.User{Email: "admin@prohealth.com", Password: string(adminHash)}
 		if res := tx.Where(model.User{Email: admin.Email}).FirstOrCreate(&admin); res.Error != nil {
 			return res.Error
 		}
 		tx.Where(model.UserDetail{UserId: admin.ID}).FirstOrCreate(&model.UserDetail{
 			UserId: admin.ID, Fullname: "Admin",
 		})
+		tx.Where(model.HospitalMember{HospitalID: hospital.ID, UserID: admin.ID}).
+			FirstOrCreate(&model.HospitalMember{
+				HospitalID: hospital.ID,
+				UserID:     admin.ID,
+				Role:       model.RoleAdmin,
+			})
 		log.Println("Admin seeded")
 
+		// Seed doctors
 		doctorHash, err := bcrypt.GenerateFromPassword([]byte("Doctor@123"), bcrypt.DefaultCost)
 		if err != nil {
 			return err
 		}
 		for _, d := range doctors {
-			user := model.User{Email: d.email, Password: string(doctorHash), Role: model.RoleDoctor}
+			user := model.User{Email: d.email, Password: string(doctorHash)}
 			if res := tx.Where(model.User{Email: d.email}).FirstOrCreate(&user); res.Error != nil {
 				return res.Error
 			}
@@ -93,6 +113,12 @@ func main() {
 			tx.Where(model.UserDetail{UserId: user.ID}).FirstOrCreate(&model.UserDetail{
 				UserId: user.ID, Fullname: d.fullname, PhoneNumber: d.phone, DepartmentID: &deptID,
 			})
+			tx.Where(model.HospitalMember{HospitalID: hospital.ID, UserID: user.ID}).
+				FirstOrCreate(&model.HospitalMember{
+					HospitalID: hospital.ID,
+					UserID:     user.ID,
+					Role:       model.RoleDoctor,
+				})
 		}
 		log.Printf("Seeded %d doctors", len(doctors))
 

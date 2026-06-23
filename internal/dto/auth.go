@@ -1,15 +1,17 @@
 package dto
 
 type RegisterRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
-	Fullname string `json:"fullname"`
-	Address  string `json:"address"`
+	HospitalID uint   `json:"hospital_id"`
+	Email      string `json:"email" binding:"required,email"`
+	Password   string `json:"password" binding:"required,min=8"`
+	Fullname   string `json:"fullname"`
+	Address    string `json:"address"`
 }
 
 type LoginInput struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
+	HospitalID uint   `json:"hospital_id"`
+	Email      string `json:"email" binding:"required,email"`
+	Password   string `json:"password" binding:"required,min=8"`
 }
 
 type ChangePasswordInput struct {

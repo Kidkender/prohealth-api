@@ -19,21 +19,15 @@ func NewUserService(db *gorm.DB) *UserService {
 }
 
 type UserResult struct {
-	ID   uint   `json:"id"`
-	Name string `json:"name"`
-	Role string `json:"role"`
+	ID         uint   `json:"id"`
+	Name       string `json:"name"`
+	Role       string `json:"role"`
+	HospitalID uint   `json:"hospital_id"`
 }
 
-func (s *UserService) GetUser(ctx context.Context, userId uint) (*UserResult, error) {
+func (s *UserService) GetUser(ctx context.Context, userId uint, hospitalID uint) (*UserResult, error) {
 	var userDetail model.UserDetail
-	var user model.User
-
-	if err := s.db.WithContext(ctx).Where("id = ?", userId).First(&user).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperror.ErrUserNotFound
-		}
-		return nil, err
-	}
+	var member model.HospitalMember
 
 	if err := s.db.WithContext(ctx).Where("user_id = ?", userId).First(&userDetail).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -41,23 +35,34 @@ func (s *UserService) GetUser(ctx context.Context, userId uint) (*UserResult, er
 		}
 		return nil, err
 	}
+
+	if err := s.db.WithContext(ctx).Where("user_id = ? AND hospital_id = ?", userId, hospitalID).First(&member).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperror.ErrHospitalMemberNotFound
+		}
+		return nil, err
+	}
+
 	return &UserResult{
-		ID:   userId,
-		Name: userDetail.Fullname,
-		Role: string(user.Role),
+		ID:         userId,
+		Name:       userDetail.Fullname,
+		Role:       string(member.Role),
+		HospitalID: member.HospitalID,
 	}, nil
 }
 
-func (s *UserService) AssignRole(ctx context.Context, payload dto.AssignRoleRequest) error {
-	var user model.User
-	if err := s.db.WithContext(ctx).Where("id = ?", payload.UserID).First(&user).Error; err != nil {
+func (s *UserService) AssignRole(ctx context.Context, hospitalID uint, payload dto.AssignRoleRequest) error {
+	var member model.HospitalMember
+	if err := s.db.WithContext(ctx).Where("user_id = ? AND hospital_id = ?", payload.UserID, hospitalID).
+		First(&member).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return apperror.ErrUserNotFound
+			return apperror.ErrHospitalMemberNotFound
 		}
 		return err
 	}
-	user.Role = payload.Role
-	if err := s.db.WithContext(ctx).Save(&user).Error; err != nil {
+
+	member.Role = payload.Role
+	if err := s.db.WithContext(ctx).Save(&member).Error; err != nil {
 		return err
 	}
 	return nil

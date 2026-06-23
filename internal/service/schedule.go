@@ -25,21 +25,22 @@ func NewScheduleService(db *gorm.DB) *ScheduleService {
 	return &ScheduleService{db: db}
 }
 
-func (s *ScheduleService) CreateSchedulePeriod(ctx context.Context, payload dto.CreateScheduleInput) error {
+func (s *ScheduleService) CreateSchedulePeriod(ctx context.Context, hospitalID uint, payload dto.CreateScheduleInput) error {
 
 	if payload.StartDate.After(payload.EndDate) {
 		return apperror.ErrInvalidTimeRange
 	}
 
 	return s.db.WithContext(ctx).Create(&model.SchedulePeriod{
-		Name:      payload.Name,
-		StartDate: payload.StartDate,
-		EndDate:   payload.EndDate,
-		Status:    payload.Status,
+		Name:       payload.Name,
+		StartDate:  payload.StartDate,
+		EndDate:    payload.EndDate,
+		Status:     payload.Status,
+		HospitalID: hospitalID,
 	}).Error
 }
 
-func (s *ScheduleService) CreateScheduleShift(ctx context.Context, payload dto.CreateScheduleShiftInput) error {
+func (s *ScheduleService) CreateScheduleShift(ctx context.Context, hospitalID uint, payload dto.CreateScheduleShiftInput) error {
 	var period model.SchedulePeriod
 	if err := s.db.WithContext(ctx).First(&period, payload.PeriodID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -68,6 +69,7 @@ func (s *ScheduleService) CreateScheduleShift(ctx context.Context, payload dto.C
 		TimeEnd:      payload.EndTime.Format("15:04"),
 		RoomNumber:   payload.RoomNumber,
 		Status:       payload.Status,
+		HospitalID:   hospitalID,
 	}
 
 	return s.db.WithContext(ctx).Create(&shift).Error
@@ -114,24 +116,25 @@ func (s *ScheduleService) UpdateSchedulePeriod(ctx context.Context, id uint, pay
 	return s.db.Save(&period).Error
 }
 
-func (s *ScheduleService) GetSchedulePeriods(ctx context.Context, filter dto.FilterSchedulePeriod) ([]model.SchedulePeriod, int64, error) {
+func (s *ScheduleService) GetSchedulePeriods(ctx context.Context, hospitalID uint, filter dto.FilterSchedulePeriod) ([]model.SchedulePeriod, int64, error) {
 	var periods []model.SchedulePeriod
 	var total int64
-	query := s.db.WithContext(ctx).Model(&model.SchedulePeriod{})
+
+	query := s.db.WithContext(ctx).
+		Model(&model.SchedulePeriod{}).
+		Where("hospital_id = ?", hospitalID)
 
 	if filter.Status != "" {
 		query = query.Where("status = ?", filter.Status)
 	}
-
 	if filter.StartDate != nil {
-		query = query.Where("start_date>=?", filter.StartDate)
+		query = query.Where("start_date >= ?", filter.StartDate)
 	}
-
 	if filter.EndDate != nil {
-		query = query.Where("end_date<=?", filter.EndDate)
+		query = query.Where("end_date <= ?", filter.EndDate)
 	}
 
-	if err := query.WithContext(ctx).Count(&total).Error; err != nil {
+	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
@@ -156,11 +159,14 @@ func (s *ScheduleService) GetSchedulePeriodById(ctx context.Context, id uint) (*
 	return &period, nil
 }
 
-func (s *ScheduleService) GetScheduleShifts(ctx context.Context, filter dto.FilterScheduleShift) ([]model.ScheduleShift, int64, error) {
+func (s *ScheduleService) GetScheduleShifts(ctx context.Context, hospitalID uint, filter dto.FilterScheduleShift) ([]model.ScheduleShift, int64, error) {
 	var shifts []model.ScheduleShift
 	var total int64
 
-	query := s.db.Model(&model.ScheduleShift{})
+	query := s.db.WithContext(ctx).
+		Model(&model.ScheduleShift{}).
+		Where("hospital_id = ?", hospitalID)
+
 	if filter.PeriodID != nil {
 		query = query.Where("period_id = ?", *filter.PeriodID)
 	}
@@ -182,10 +188,10 @@ func (s *ScheduleService) GetScheduleShifts(ctx context.Context, filter dto.Filt
 	if filter.Status != nil {
 		query = query.Where("status = ?", *filter.Status)
 	}
+
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-
 	if err := query.
 		Limit(filter.Limit).
 		Offset(filter.Offset()).
@@ -277,27 +283,27 @@ func (s *ScheduleService) UpdateScheduleShift(ctx context.Context, shiftID uint,
 
 }
 
-func (s *ScheduleService) GetScheduleShiftByDoctor(ctx context.Context, doctorID uint, filter *dto.FilterScheduleShift) (*model.ScheduleShift, error) {
-	var shift model.ScheduleShift
+func (s *ScheduleService) GetScheduleShiftByDoctor(ctx context.Context, hospitalID uint, doctorID uint, filter *dto.FilterScheduleShift) ([]model.ScheduleShift, error) {
+	var shifts []model.ScheduleShift
 
 	query := s.db.WithContext(ctx).
 		Model(&model.ScheduleShift{}).
+		Where("schedule_shifts.hospital_id = ?", hospitalID).
 		Joins("JOIN schedule_shift_doctors ON schedule_shift_doctors.shift_id = schedule_shifts.id").
 		Where("schedule_shift_doctors.user_id = ?", doctorID)
 
 	if filter.Date != nil {
-		query = query.Where("date = ?", *filter.Date)
+		query = query.Where("schedule_shifts.date = ?", *filter.Date)
 	}
 
-	result := query.Find(&shift)
-	if result.Error != nil {
-		return nil, result.Error
+	if err := query.Find(&shifts).Error; err != nil {
+		return nil, err
 	}
-	return &shift, nil
+	return shifts, nil
 }
 
 func (s *ScheduleService) GenerateSchedule(
-	ctx context.Context, payload dto.GenerateScheduleInput,
+	ctx context.Context, hospitalID uint, payload dto.GenerateScheduleInput,
 ) (*dto.GenerateScheduleResponse, error) {
 	s.generateMu.Lock()
 	defer s.generateMu.Unlock()
@@ -326,7 +332,7 @@ func (s *ScheduleService) GenerateSchedule(
 
 		if err := tx.WithContext(ctx).
 			Model(&model.SchedulePeriod{}).
-			Where("start_date = ? AND status = ?", monday, model.PeriodPublished).
+			Where("hospital_id = ? AND start_date = ? AND status = ?", hospitalID, monday, model.PeriodPublished).
 			Count(&count).Error; err != nil {
 			return err
 		}
@@ -336,10 +342,11 @@ func (s *ScheduleService) GenerateSchedule(
 		}
 
 		period = model.SchedulePeriod{
-			Name:      fmt.Sprintf("Week %s - %s", monday.Format("Jan 2"), friday.Format("Jan 2, 2006")),
-			StartDate: monday,
-			EndDate:   friday,
-			Status:    model.PeriodPublished,
+			HospitalID: hospitalID,
+			Name:       fmt.Sprintf("Week %s - %s", monday.Format("Jan 2"), friday.Format("Jan 2, 2006")),
+			StartDate:  monday,
+			EndDate:    friday,
+			Status:     model.PeriodPublished,
 		}
 		if err := tx.WithContext(ctx).Create(&period).Error; err != nil {
 			return err
@@ -410,6 +417,7 @@ func (s *ScheduleService) GenerateSchedule(
 					doctorIdx++
 					if doctorWeekCount[ud.UserId] < maxShiftsPerWeek && !doctorDayAssigned[dateKey][ud.UserId] {
 						shift := model.ScheduleShift{
+							HospitalID:   hospitalID,
 							PeriodID:     period.ID,
 							DepartmentID: dept.ID,
 							Date:         s.date,

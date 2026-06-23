@@ -4,17 +4,11 @@ import "time"
 
 type UserRole string
 
-const (
-	RoleAdmin  UserRole = "admin"
-	RoleDoctor UserRole = "doctor"
-	RoleUser   UserRole = "user"
-)
-
 type User struct {
-	ID       uint
-	Email    string
-	Password string
-	Role     UserRole
+	ID       uint     `gorm:"primaryKey"`
+	Email    string   `gorm:"unique"`
+	Password string   `gorm:"not null"`
+	Hospital Hospital `gorm:"foreignKey:HospitalID"`
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

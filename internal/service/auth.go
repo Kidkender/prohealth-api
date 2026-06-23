@@ -47,10 +47,14 @@ func (s *AuthService) Register(
 
 	return s.db.Transaction(func(tx *gorm.DB) error {
 
+		hospital := model.Hospital{}
+		if err = tx.First(&hospital, req.HospitalID).Error; err != nil {
+			return err
+		}
+
 		user := model.User{
 			Email:    req.Email,
 			Password: string(hash),
-			Role:     model.RoleUser,
 		}
 		if err = tx.Create(&user).Error; err != nil {
 			return err
@@ -63,6 +67,15 @@ func (s *AuthService) Register(
 		if err = tx.Create(&profile).Error; err != nil {
 			return err
 		}
+
+		if err := tx.Create(&model.HospitalMember{
+			HospitalID: req.HospitalID,
+			UserID:     user.ID,
+			Role:       model.RoleDoctor,
+		}).Error; err != nil {
+			return err
+		}
+
 		return nil
 
 	})
@@ -73,6 +86,8 @@ func (s *AuthService) Login(
 	req *dto.LoginInput,
 ) (*AuthResult, error) {
 	var user model.User
+	var member model.HospitalMember
+
 	err := s.db.Where("email = ?", req.Email).First(&user).Error
 	if err != nil {
 		return nil, apperror.ErrUserNotFound
@@ -82,7 +97,12 @@ func (s *AuthService) Login(
 		return nil, apperror.ErrInvalidCredentials
 	}
 
-	claims := security.NewClaims(user.ID, user.Role)
+	if err := s.db.Where("hospital_id = ? AND user_id = ?", req.HospitalID, user.ID).
+		First(&member).Error; err != nil {
+		return nil, apperror.ErrUnauthorized
+	}
+
+	claims := security.NewClaims(user.ID, member.Role)
 	token, err := security.GenerateToken(claims)
 
 	if err != nil {
