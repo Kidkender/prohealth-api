@@ -12,15 +12,15 @@ import (
 )
 
 type Claims struct {
-	UserId uint           `json:"user_id"`
-	Role   model.UserRole `json:"role"`
+	UserId     uint             `json:"user_id"`
+	SystemRole model.SystemRole `json:"system_role"`
 	jwt.RegisteredClaims
 }
 
-func NewClaims(user_id uint, role model.UserRole) *Claims {
+func NewClaims(user_id uint, systemRole string) *Claims {
 	return &Claims{
-		UserId: user_id,
-		Role:   role,
+		UserId:     user_id,
+		SystemRole: model.SystemRole(systemRole),
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(
 				time.Now().Add(24 * time.Hour),

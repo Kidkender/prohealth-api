@@ -13,10 +13,12 @@ func RegisterRoutes(r *gin.Engine, c *container.Container) {
 	userHandler := handler.NewUserHandler(c.UserService)
 	scheduleHandler := handler.NewScheduleHandler(c.ScheduleService)
 	appointmentHandler := handler.NewAppointmentHandler(c.AppointmentService)
+	hospitalHandler := handler.NewHospitalHandler(c.HospitalService)
 
 	api.GET("/health", handler.HealthCheck)
 	RegisterAuthRoutes(api, authHandler)
 	RegisterUserRoutes(api, userHandler)
 	RegisterScheduleRoutes(api, scheduleHandler)
 	RegisterAppointmentRoutes(api, appointmentHandler)
+	RegisterHospitalRoutes(api, hospitalHandler)
 }

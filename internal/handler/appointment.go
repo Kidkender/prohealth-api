@@ -58,7 +58,7 @@ func (h *AppointmentHandler) UpdateAppointment(c *gin.Context) {
 		return
 	}
 	callerID := context.UserId(c)
-	callerRole := model.UserRole(context.UserRole(c))
+	callerRole := model.UserRole(context.HospitalRole(c))
 	if err := h.appointmentService.UpdateAppointment(c, id, callerID, callerRole, req); err != nil {
 		apperror.HandleError(c, err)
 		return

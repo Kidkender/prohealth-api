@@ -2,6 +2,8 @@ package model
 
 import "time"
 
+type UserRole string
+
 const (
 	RoleAdmin  UserRole = "admin"
 	RoleDoctor UserRole = "doctor"

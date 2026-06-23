@@ -12,6 +12,7 @@ type Container struct {
 	UserService        *service.UserService
 	ScheduleService    *service.ScheduleService
 	AppointmentService *service.AppointmentService
+	HospitalService    *service.HospitalService
 	OutboxWorker       *worker.OutboxWorker
 }
 
@@ -29,6 +30,7 @@ func New(db *gorm.DB, cfg *config.Config) *Container {
 		UserService:        service.NewUserService(db),
 		ScheduleService:    service.NewScheduleService(db),
 		AppointmentService: service.NewAppointmentService(db, mailService),
+		HospitalService:    service.NewHospitalService(db),
 		OutboxWorker:       worker.NewOutboxWorker(db, mailService),
 	}
 }

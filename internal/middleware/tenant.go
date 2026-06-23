@@ -38,9 +38,9 @@ func TenantMiddleware(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		var member model.HospitalMember
 		if userIDVal, exists := c.Get("user_id"); exists {
 			if userID, ok := userIDVal.(uint); ok && userID > 0 {
-				var member model.HospitalMember
 				if err := db.
 					Where("hospital_id = ? AND user_id = ?", hospitalID, userID).
 					First(&member).Error; err != nil {
@@ -53,6 +53,7 @@ func TenantMiddleware(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		c.Set("hospital_id", uint(hospitalID))
+		c.Set("hospital_role", string(member.Role))
 		c.Next()
 	}
 }

@@ -102,7 +102,7 @@ func (s *AuthService) Login(
 		return nil, apperror.ErrUnauthorized
 	}
 
-	claims := security.NewClaims(user.ID, member.Role)
+	claims := security.NewClaims(user.ID, string(user.SystemRole))
 	token, err := security.GenerateToken(claims)
 
 	if err != nil {
