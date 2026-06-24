@@ -86,7 +86,6 @@ func (s *AuthService) Login(
 	req *dto.LoginInput,
 ) (*AuthResult, error) {
 	var user model.User
-	var member model.HospitalMember
 
 	err := s.db.Where("email = ?", req.Email).First(&user).Error
 	if err != nil {
@@ -97,12 +96,7 @@ func (s *AuthService) Login(
 		return nil, apperror.ErrInvalidCredentials
 	}
 
-	if err := s.db.Where("hospital_id = ? AND user_id = ?", req.HospitalID, user.ID).
-		First(&member).Error; err != nil {
-		return nil, apperror.ErrUnauthorized
-	}
-
-	claims := security.NewClaims(user.ID, string(user.SystemRole))
+	claims := security.NewClaims(user.ID, user.SystemRole)
 	token, err := security.GenerateToken(claims)
 
 	if err != nil {

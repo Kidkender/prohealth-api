@@ -17,7 +17,7 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func NewClaims(user_id uint, systemRole string) *Claims {
+func NewClaims(user_id uint, systemRole model.SystemRole) *Claims {
 	return &Claims{
 		UserId:     user_id,
 		SystemRole: model.SystemRole(systemRole),

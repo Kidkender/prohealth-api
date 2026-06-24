@@ -121,8 +121,11 @@ func (s *ScheduleService) GetSchedulePeriods(ctx context.Context, hospitalID uin
 	var total int64
 
 	query := s.db.WithContext(ctx).
-		Model(&model.SchedulePeriod{}).
-		Where("hospital_id = ?", hospitalID)
+		Model(&model.SchedulePeriod{})
+
+	if hospitalID > 0 {
+		query = query.Where("hospital_id = ?", hospitalID)
+	}
 
 	if filter.Status != "" {
 		query = query.Where("status = ?", filter.Status)

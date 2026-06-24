@@ -9,9 +9,8 @@ type RegisterRequest struct {
 }
 
 type LoginInput struct {
-	HospitalID uint   `json:"hospital_id"`
-	Email      string `json:"email" binding:"required,email"`
-	Password   string `json:"password" binding:"required,min=8"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8"`
 }
 
 type ChangePasswordInput struct {

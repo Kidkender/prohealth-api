@@ -11,9 +11,17 @@ import (
 
 func TenantMiddleware(db *gorm.DB) gin.HandlerFunc {
 	skipRoutes := map[skipKey]bool{
-		{http.MethodPost, "/api/v1/auth/register"}: true,
-		{http.MethodPost, "/api/v1/auth/login"}:    true,
-		{http.MethodGet, "/api/v1/health"}:         true,
+		{http.MethodPost, "/api/v1/auth/register"}:            true,
+		{http.MethodPost, "/api/v1/auth/login"}:               true,
+		{http.MethodPut, "/api/v1/auth/change-password"}:      true,
+		{http.MethodGet, "/api/v1/health"}:                    true,
+		{http.MethodGet, "/api/v1/users/me"}:                  true,
+		{http.MethodGet, "/api/v1/hospital/me"}:               true,
+		{http.MethodGet, "/api/v1/hospital"}:                  true,
+		{http.MethodGet, "/api/v1/hospital/:id"}:              true,
+		{http.MethodGet, "/api/v1/schedule/period"}:           true,
+		{http.MethodGet, "/api/v1/schedule/period/:id/shift"}: true,
+		{http.MethodPost, "/api/v1/appointments/"}:            true,
 	}
 
 	return func(c *gin.Context) {

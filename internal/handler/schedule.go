@@ -87,7 +87,13 @@ func (h *ScheduleHandler) GetSchedulePeriods(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
-	periods, total, err := h.scheduleService.GetSchedulePeriods(c, context.HospitalId(c), filter)
+	var hospitalID uint
+	if filter.HospitalID != nil {
+		hospitalID = *filter.HospitalID
+	} else if id, exists := c.Get("hospital_id"); exists {
+		hospitalID, _ = id.(uint)
+	}
+	periods, total, err := h.scheduleService.GetSchedulePeriods(c, hospitalID, filter)
 	if err != nil {
 		apperror.HandleError(c, err)
 		return

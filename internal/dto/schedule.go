@@ -42,9 +42,10 @@ type SetDoctorForShiftInput struct {
 
 type FilterSchedulePeriod struct {
 	PaginationQuery
-	StartDate *time.Time         `form:"start_date" `
-	EndDate   *time.Time         `form:"end_date" `
-	Status    model.PeriodStatus `form:"status" `
+	HospitalID *uint              `form:"hospital_id"`
+	StartDate  *time.Time         `form:"start_date"`
+	EndDate    *time.Time         `form:"end_date"`
+	Status     model.PeriodStatus `form:"status"`
 }
 
 type FilterScheduleShift struct {

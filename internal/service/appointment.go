@@ -35,7 +35,7 @@ func NewAppointmentService(db *gorm.DB, mail *MailService) *AppointmentService {
 	return &AppointmentService{db: db, mail: mail}
 }
 
-func (s *AppointmentService) CreateAppointment(ctx context.Context, payload dto.CreateAppointmentInput) error {
+func (s *AppointmentService) CreateAppointment(ctx context.Context, payload dto.CreateAppointmentInput, hospitalID uint) error {
 	var shift model.ScheduleShift
 	if err := s.db.First(&shift, payload.ShiftID).Error; err != nil {
 		return err
@@ -49,6 +49,7 @@ func (s *AppointmentService) CreateAppointment(ctx context.Context, payload dto.
 
 		appointment := model.Appointment{
 			ShiftID:         payload.ShiftID,
+			HospitalID:      hospitalID,
 			PatientName:     payload.PatientName,
 			PatientPhone:    payload.PatientPhone,
 			PatientEmail:    payload.PatientEmail,
@@ -79,10 +80,10 @@ func (s *AppointmentService) CreateAppointment(ctx context.Context, payload dto.
 	})
 }
 
-func (s *AppointmentService) GetAppointments(ctx context.Context, filter dto.FilterAppointment) ([]AppointmentResult, int64, error) {
+func (s *AppointmentService) GetAppointments(ctx context.Context, hospitalID uint, filter dto.FilterAppointment) ([]AppointmentResult, int64, error) {
 	var appointments []model.Appointment
 
-	query := s.db.WithContext(ctx).Model(&model.Appointment{})
+	query := s.db.WithContext(ctx).Model(&model.Appointment{}).Where("hospital_id = ?", hospitalID)
 	if filter.ShiftID != nil {
 		query = query.Where("shift_id = ?", *filter.ShiftID)
 	}
@@ -139,7 +140,7 @@ func (s *AppointmentService) UpdateAppointment(ctx context.Context, id uint, cal
 	if callerRole == model.RoleDoctor {
 		var shift model.ScheduleShift
 		err := s.db.WithContext(ctx).
-			Joins("JOIN schedule_shift_doctors ON schedule_shift_doctors.user_id = schedule_shifts.id").
+			Joins("JOIN schedule_shift_doctors ON schedule_shift_doctors.shift_id = schedule_shifts.id").
 			Where("schedule_shift_doctors.user_id = ? AND schedule_shifts.id = ?", callerID, appt.ShiftID).
 			First(&shift).Error
 		if err != nil {
@@ -158,7 +159,7 @@ func (s *AppointmentService) UpdateAppointment(ctx context.Context, id uint, cal
 	return s.db.WithContext(ctx).Save(&appt).Error
 }
 
-func (s *AppointmentService) GetAppointmentDoctor(ctx context.Context, doctorID uint, filter *dto.FilterAppointmentDoctor) ([]AppointmentResult, error) {
+func (s *AppointmentService) GetAppointmentDoctor(ctx context.Context, hospitalID uint, doctorID uint, filter *dto.FilterAppointmentDoctor) ([]AppointmentResult, error) {
 	slog.Info("GetAppointmentDoctor", "doctorID", doctorID)
 
 	if err := s.db.WithContext(ctx).First(&model.User{}, doctorID).Error; err != nil {
@@ -181,6 +182,7 @@ func (s *AppointmentService) GetAppointmentDoctor(ctx context.Context, doctorID 
 	query := s.db.WithContext(ctx).
 		Joins("JOIN schedule_shift_doctors ON schedule_shift_doctors.shift_id = appointments.shift_id").
 		Joins("JOIN schedule_shifts ON schedule_shifts.id = appointments.shift_id").
+		Where("appointments.hospital_id = ?", hospitalID).
 		Where("schedule_shift_doctors.user_id = ?", doctorID).
 		Where("schedule_shifts.date >= ? AND schedule_shifts.date < ?", from, to)
 

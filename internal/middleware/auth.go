@@ -22,6 +22,8 @@ func AuthMiddleware() gin.HandlerFunc {
 		{http.MethodGet, "/api/v1/schedule/period"}:           true,
 		{http.MethodGet, "/api/v1/schedule/period/:id/shift"}: true,
 		{http.MethodPost, "/api/v1/appointments/"}:            true,
+		{http.MethodGet, "/api/v1/hospital"}:                  true,
+		{http.MethodGet, "/api/v1/hospital/:id"}:              true,
 	}
 
 	return func(ctx *gin.Context) {
