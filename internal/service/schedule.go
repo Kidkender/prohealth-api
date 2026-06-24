@@ -75,6 +75,26 @@ func (s *ScheduleService) CreateScheduleShift(ctx context.Context, hospitalID ui
 	return s.db.WithContext(ctx).Create(&shift).Error
 }
 
+func (s *ScheduleService) ReplaceDoctorsForShift(ctx context.Context, shiftID uint, doctorIDs []uint) error {
+	if err := s.db.WithContext(ctx).First(&model.ScheduleShift{}, shiftID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperror.ErrScheduleShiftNotFound
+		}
+		return err
+	}
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.WithContext(ctx).Where("shift_id = ?", shiftID).Delete(&model.ScheduleShiftDoctor{}).Error; err != nil {
+			return err
+		}
+		for _, uid := range doctorIDs {
+			if err := tx.WithContext(ctx).Create(&model.ScheduleShiftDoctor{ShiftID: shiftID, UserID: uid}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func (s *ScheduleService) SetDoctorForShift(ctx context.Context, payload dto.SetDoctorForShiftInput) error {
 	if err := s.db.WithContext(ctx).First(&model.ScheduleShift{}, payload.ShiftID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -293,7 +313,9 @@ func (s *ScheduleService) GetScheduleShiftByDoctor(ctx context.Context, hospital
 		Model(&model.ScheduleShift{}).
 		Where("schedule_shifts.hospital_id = ?", hospitalID).
 		Joins("JOIN schedule_shift_doctors ON schedule_shift_doctors.shift_id = schedule_shifts.id").
-		Where("schedule_shift_doctors.user_id = ?", doctorID)
+		Where("schedule_shift_doctors.user_id = ?", doctorID).
+		Preload("Department").
+		Preload("Doctors.UserDetail")
 
 	if filter.Date != nil {
 		query = query.Where("schedule_shifts.date = ?", *filter.Date)
@@ -364,8 +386,8 @@ func (s *ScheduleService) GenerateSchedule(
 		var depts []model.Department
 		if err := tx.WithContext(ctx).
 			Joins("JOIN user_details ON user_details.department_id = departments.id").
-			Joins("JOIN users ON users.id = user_details.user_id").
-			Where("users.role = ?", model.RoleDoctor).
+			Joins("JOIN hospital_members ON hospital_members.user_id = user_details.user_id").
+			Where("hospital_members.hospital_id = ? AND hospital_members.role = ?", hospitalID, model.RoleDoctor).
 			Group("departments.id").
 			Find(&depts).Error; err != nil {
 			return err
@@ -374,8 +396,9 @@ func (s *ScheduleService) GenerateSchedule(
 		for deptIdx, dept := range depts {
 			var userDetails []model.UserDetail
 			if err := tx.WithContext(ctx).
-				Joins("JOIN users ON users.id = user_details.user_id").
-				Where("user_details.department_id = ? AND users.role = ?", dept.ID, model.RoleDoctor).
+				Joins("JOIN hospital_members ON hospital_members.user_id = user_details.user_id").
+				Where("user_details.department_id = ? AND hospital_members.hospital_id = ? AND hospital_members.role = ?",
+					dept.ID, hospitalID, model.RoleDoctor).
 				Find(&userDetails).Error; err != nil {
 				return err
 			}

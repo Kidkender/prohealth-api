@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/kidkender/prohealth-api/internal/apperror"
 	"github.com/kidkender/prohealth-api/internal/dto"
@@ -91,11 +92,13 @@ func (s *AuthService) Login(
 	if err != nil {
 		return nil, apperror.ErrUserNotFound
 	}
+	slog.Info("user found", "email", req.Email)
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 		return nil, apperror.ErrInvalidCredentials
 	}
 
+	slog.Info("system role", "role", user.SystemRole)
 	claims := security.NewClaims(user.ID, user.SystemRole)
 	token, err := security.GenerateToken(claims)
 

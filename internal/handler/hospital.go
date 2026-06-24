@@ -71,6 +71,19 @@ func (h *HospitalHandler) UpdateHospital(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Done())
 }
 
+func (h *HospitalHandler) GetHospitalDoctors(c *gin.Context) {
+	id, ok := context.ParseParamUint(c, "id")
+	if !ok {
+		return
+	}
+	doctors, err := h.service.GetHospitalDoctors(c, id)
+	if err != nil {
+		apperror.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, response.Ok(doctors))
+}
+
 func (h *HospitalHandler) GetHospitalByMe(c *gin.Context) {
 	userID := context.UserId(c)
 	results, err := h.service.GetHospitalByUser(c, userID)

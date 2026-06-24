@@ -27,7 +27,6 @@ type UserResult struct {
 
 func (s *UserService) GetUser(ctx context.Context, userId uint, hospitalID uint) (*UserResult, error) {
 	var userDetail model.UserDetail
-	var member model.HospitalMember
 
 	if err := s.db.WithContext(ctx).Where("user_id = ?", userId).First(&userDetail).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -36,6 +35,14 @@ func (s *UserService) GetUser(ctx context.Context, userId uint, hospitalID uint)
 		return nil, err
 	}
 
+	if hospitalID == 0 {
+		return &UserResult{
+			ID:   userId,
+			Name: userDetail.Fullname,
+		}, nil
+	}
+
+	var member model.HospitalMember
 	if err := s.db.WithContext(ctx).Where("user_id = ? AND hospital_id = ?", userId, hospitalID).First(&member).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperror.ErrHospitalMemberNotFound

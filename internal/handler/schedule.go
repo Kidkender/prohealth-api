@@ -206,6 +206,25 @@ func (h *ScheduleHandler) GenerateSchedule(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Ok(result))
 }
 
+func (h *ScheduleHandler) ReplaceDoctorsForShift(c *gin.Context) {
+	id, ok := context.ParseParamUint(c, "id")
+	if !ok {
+		return
+	}
+	var payload struct {
+		DoctorIDs []uint `json:"doctor_ids"`
+	}
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		apperror.ValidationError(c, err)
+		return
+	}
+	if err := h.scheduleService.ReplaceDoctorsForShift(c, uint(id), payload.DoctorIDs); err != nil {
+		apperror.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, response.Done())
+}
+
 func (h *ScheduleHandler) UpdateScheduleShift(c *gin.Context) {
 	var req dto.UpdateScheduleShiftInput
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -238,5 +257,5 @@ func (h *ScheduleHandler) GetScheduleShiftByDoctor(c *gin.Context) {
 		apperror.HandleError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, response.Ok(result))
+	c.JSON(http.StatusOK, response.Ok(response.ToScheduleShiftResponses(result)))
 }

@@ -18,6 +18,7 @@ func TenantMiddleware(db *gorm.DB) gin.HandlerFunc {
 		{http.MethodGet, "/api/v1/users/me"}:                  true,
 		{http.MethodGet, "/api/v1/hospital/me"}:               true,
 		{http.MethodGet, "/api/v1/hospital"}:                  true,
+		{http.MethodPost, "/api/v1/hospital"}:                 true,
 		{http.MethodGet, "/api/v1/hospital/:id"}:              true,
 		{http.MethodGet, "/api/v1/schedule/period"}:           true,
 		{http.MethodGet, "/api/v1/schedule/period/:id/shift"}: true,

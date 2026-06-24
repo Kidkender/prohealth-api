@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -50,9 +51,10 @@ func AuthMiddleware() gin.HandlerFunc {
 			})
 			return
 		}
+		slog.Info("Authenticate claims", "claims", claims)
 
 		ctx.Set("user_id", claims.UserId)
-		ctx.Set("system_role", claims.SystemRole)
+		ctx.Set("system_role", string(claims.SystemRole))
 		ctx.Next()
 	}
 }

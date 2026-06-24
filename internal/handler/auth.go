@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -42,6 +43,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
+
+	slog.Info("login request", "email", req.Email)
 
 	result, err := h.authService.Login(c, &req)
 	if err != nil {

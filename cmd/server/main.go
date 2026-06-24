@@ -33,6 +33,7 @@ func main() {
 	go c.OutboxWorker.Run(ctx)
 
 	r := gin.Default()
+	r.RedirectTrailingSlash = false
 	r.Use(middleware.CorsMiddleware(cfg.CORSOrigin))
 	r.Use(middleware.AuthMiddleware())
 	r.Use(middleware.TenantMiddleware(db))

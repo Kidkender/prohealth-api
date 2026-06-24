@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log/slog"
 	"net/http"
 	"slices"
 
@@ -13,6 +14,9 @@ import (
 func RequireRole(roles ...model.UserRole) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role := model.UserRole(context.HospitalRole(c))
+
+		slog.Info("Role context: ", "role", role)
+		slog.Info("Required roles: ", "roles", roles)
 		if role == "" {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"error": apperror.ErrForbidden,
@@ -34,6 +38,7 @@ func RequireRole(roles ...model.UserRole) gin.HandlerFunc {
 func RequireSystemRole(roles ...model.SystemRole) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role := model.SystemRole(context.SystemRole(c))
+
 		if role == "" {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"error": apperror.ErrForbidden,

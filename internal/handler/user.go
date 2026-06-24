@@ -21,7 +21,12 @@ func NewUserHandler(userService *service.UserService) *UserHandler {
 
 func (h *UserHandler) GetMe(c *gin.Context) {
 	userId := context.UserId(c)
-	hospitalID := context.HospitalId(c)
+
+	hospitalIDVal, exists := c.Get("hospital_id")
+	var hospitalID uint
+	if exists {
+		hospitalID = hospitalIDVal.(uint)
+	}
 
 	result, err := h.userService.GetUser(c, userId, hospitalID)
 	if err != nil {

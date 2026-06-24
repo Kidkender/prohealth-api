@@ -82,6 +82,22 @@ func (s *HospitalService) UpdateHospital(ctx context.Context, id uint, req dto.U
 	return s.db.WithContext(ctx).Save(hospital).Error
 }
 
+type HospitalDoctor struct {
+	UserID   uint   `json:"user_id"`
+	Fullname string `json:"fullname"`
+}
+
+func (s *HospitalService) GetHospitalDoctors(ctx context.Context, hospitalID uint) ([]HospitalDoctor, error) {
+	var results []HospitalDoctor
+	err := s.db.WithContext(ctx).
+		Model(&model.UserDetail{}).
+		Select("user_details.user_id, user_details.full_name as fullname").
+		Joins("JOIN hospital_members ON hospital_members.user_id = user_details.user_id").
+		Where("hospital_members.hospital_id = ? AND hospital_members.role = ?", hospitalID, model.RoleDoctor).
+		Scan(&results).Error
+	return results, err
+}
+
 func (s *HospitalService) GetHospitalByUser(ctx context.Context, userID uint) ([]HospitalWithRole, error) {
 	var results []HospitalWithRole
 	err := s.db.WithContext(ctx).

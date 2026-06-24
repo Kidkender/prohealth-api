@@ -99,6 +99,25 @@ func main() {
 		}
 		log.Println("Admin seeded")
 
+		hospitalAdminHash, err := bcrypt.GenerateFromPassword([]byte("HospAdmin@123"), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
+		hospitalAdmin := model.User{Email: "hospitaladmin@prohealth.com", Password: string(hospitalAdminHash), SystemRole: model.SystemRoleUser}
+		if res := tx.Where(model.User{Email: hospitalAdmin.Email}).FirstOrCreate(&hospitalAdmin); res.Error != nil {
+			return res.Error
+		}
+		tx.Where(model.UserDetail{UserId: hospitalAdmin.ID}).FirstOrCreate(&model.UserDetail{
+			UserId: hospitalAdmin.ID, Fullname: "Hospital Admin",
+		})
+		tx.Where(model.HospitalMember{HospitalID: hospital.ID, UserID: hospitalAdmin.ID}).
+			FirstOrCreate(&model.HospitalMember{
+				HospitalID: hospital.ID,
+				UserID:     hospitalAdmin.ID,
+				Role:       model.RoleAdmin,
+			})
+		log.Println("Hospital admin seeded")
+
 		// Seed doctors
 		doctorHash, err := bcrypt.GenerateFromPassword([]byte("Doctor@123"), bcrypt.DefaultCost)
 		if err != nil {
@@ -110,7 +129,7 @@ func main() {
 		}
 
 		for _, d := range doctors {
-			user := model.User{Email: d.email, Password: string(doctorHash)}
+			user := model.User{Email: d.email, Password: string(doctorHash), SystemRole: model.SystemRoleUser}
 			if res := tx.Where(model.User{Email: d.email}).FirstOrCreate(&user); res.Error != nil {
 				return res.Error
 			}
