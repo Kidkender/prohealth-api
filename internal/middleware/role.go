@@ -30,7 +30,7 @@ func RequireRole(roles ...model.UserRole) gin.HandlerFunc {
 		}
 
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
-			"error": "forbidden",
+			"error": apperror.ErrForbidden,
 		})
 	}
 }

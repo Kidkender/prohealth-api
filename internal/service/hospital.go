@@ -98,6 +98,42 @@ func (s *HospitalService) GetHospitalDoctors(ctx context.Context, hospitalID uin
 	return results, err
 }
 
+type HospitalMemberDetail struct {
+	UserID   uint   `json:"user_id"`
+	Fullname string `json:"fullname"`
+	Email    string `json:"email"`
+	Role     string `json:"role"`
+}
+
+func (s *HospitalService) GetHospitalMembers(ctx context.Context, hospitalID uint) ([]HospitalMemberDetail, error) {
+	var results []HospitalMemberDetail
+	err := s.db.WithContext(ctx).
+		Model(&model.HospitalMember{}).
+		Select("hospital_members.user_id, user_details.full_name as fullname, users.email, hospital_members.role").
+		Joins("JOIN users ON users.id = hospital_members.user_id").
+		Joins("JOIN user_details ON user_details.user_id = hospital_members.user_id").
+		Where("hospital_members.hospital_id = ?", hospitalID).
+		Scan(&results).Error
+	return results, err
+}
+
+func (s *HospitalService) AddMemberByEmail(ctx context.Context, hospitalID uint, email string, role model.UserRole) error {
+	var user model.User
+	if err := s.db.WithContext(ctx).Where("email = ?", email).First(&user).Error; err != nil {
+		return apperror.ErrUserNotFound
+	}
+	member := model.HospitalMember{HospitalID: hospitalID, UserID: user.ID, Role: role}
+	return s.db.WithContext(ctx).
+		Where(model.HospitalMember{HospitalID: hospitalID, UserID: user.ID}).
+		FirstOrCreate(&member).Error
+}
+
+func (s *HospitalService) RemoveMember(ctx context.Context, hospitalID uint, userID uint) error {
+	return s.db.WithContext(ctx).
+		Where("hospital_id = ? AND user_id = ?", hospitalID, userID).
+		Delete(&model.HospitalMember{}).Error
+}
+
 func (s *HospitalService) GetHospitalByUser(ctx context.Context, userID uint) ([]HospitalWithRole, error) {
 	var results []HospitalWithRole
 	err := s.db.WithContext(ctx).

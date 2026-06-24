@@ -89,14 +89,6 @@ func main() {
 		tx.Where(model.UserDetail{UserId: admin.ID}).FirstOrCreate(&model.UserDetail{
 			UserId: admin.ID, Fullname: "Admin",
 		})
-		for _, h := range hospitalSeeds {
-			tx.Where(model.HospitalMember{HospitalID: h.ID, UserID: admin.ID}).
-				FirstOrCreate(&model.HospitalMember{
-					HospitalID: h.ID,
-					UserID:     admin.ID,
-					Role:       model.RoleAdmin,
-				})
-		}
 		log.Println("Admin seeded")
 
 		hospitalAdminHash, err := bcrypt.GenerateFromPassword([]byte("HospAdmin@123"), bcrypt.DefaultCost)

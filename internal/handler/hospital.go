@@ -7,6 +7,7 @@ import (
 	"github.com/kidkender/prohealth-api/internal/apperror"
 	"github.com/kidkender/prohealth-api/internal/context"
 	"github.com/kidkender/prohealth-api/internal/dto"
+	"github.com/kidkender/prohealth-api/internal/model"
 	"github.com/kidkender/prohealth-api/internal/response"
 	"github.com/kidkender/prohealth-api/internal/service"
 )
@@ -82,6 +83,46 @@ func (h *HospitalHandler) GetHospitalDoctors(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, response.Ok(doctors))
+}
+
+func (h *HospitalHandler) GetMembers(c *gin.Context) {
+	hospitalID := context.HospitalId(c)
+	members, err := h.service.GetHospitalMembers(c, hospitalID)
+	if err != nil {
+		apperror.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, response.Ok(members))
+}
+
+func (h *HospitalHandler) AddMember(c *gin.Context) {
+	var payload struct {
+		Email string             `json:"email" binding:"required,email"`
+		Role  model.UserRole     `json:"role"  binding:"required,oneof=admin doctor user"`
+	}
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		apperror.ValidationError(c, err)
+		return
+	}
+	hospitalID := context.HospitalId(c)
+	if err := h.service.AddMemberByEmail(c, hospitalID, payload.Email, payload.Role); err != nil {
+		apperror.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, response.Done())
+}
+
+func (h *HospitalHandler) RemoveMember(c *gin.Context) {
+	userID, ok := context.ParseParamUint(c, "userId")
+	if !ok {
+		return
+	}
+	hospitalID := context.HospitalId(c)
+	if err := h.service.RemoveMember(c, hospitalID, userID); err != nil {
+		apperror.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, response.Done())
 }
 
 func (h *HospitalHandler) GetHospitalByMe(c *gin.Context) {

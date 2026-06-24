@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kidkender/prohealth-api/internal/apperror"
 	"github.com/kidkender/prohealth-api/internal/model"
 	"gorm.io/gorm"
 )
@@ -23,6 +24,7 @@ func TenantMiddleware(db *gorm.DB) gin.HandlerFunc {
 		{http.MethodGet, "/api/v1/schedule/period"}:           true,
 		{http.MethodGet, "/api/v1/schedule/period/:id/shift"}: true,
 		{http.MethodPost, "/api/v1/appointments/"}:            true,
+		{http.MethodGet, "/api/v1/admin/stats"}:               true,
 	}
 
 	return func(c *gin.Context) {
@@ -54,7 +56,7 @@ func TenantMiddleware(db *gorm.DB) gin.HandlerFunc {
 					Where("hospital_id = ? AND user_id = ?", hospitalID, userID).
 					First(&member).Error; err != nil {
 					c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
-						"error": "user does not belong to this hospital",
+						"error": apperror.ErrForbidden,
 					})
 					return
 				}

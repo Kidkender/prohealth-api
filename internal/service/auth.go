@@ -47,12 +47,6 @@ func (s *AuthService) Register(
 	}
 
 	return s.db.Transaction(func(tx *gorm.DB) error {
-
-		hospital := model.Hospital{}
-		if err = tx.First(&hospital, req.HospitalID).Error; err != nil {
-			return err
-		}
-
 		user := model.User{
 			Email:    req.Email,
 			Password: string(hash),
@@ -69,16 +63,7 @@ func (s *AuthService) Register(
 			return err
 		}
 
-		if err := tx.Create(&model.HospitalMember{
-			HospitalID: req.HospitalID,
-			UserID:     user.ID,
-			Role:       model.RoleDoctor,
-		}).Error; err != nil {
-			return err
-		}
-
 		return nil
-
 	})
 }
 
