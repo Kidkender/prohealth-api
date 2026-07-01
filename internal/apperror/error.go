@@ -52,3 +52,7 @@ func Forbidden(code string) *AppError {
 func Conflict(code string) *AppError {
 	return &AppError{Status: http.StatusConflict, Code: code}
 }
+
+func RateLimitExceeded(code string) *AppError {
+	return &AppError{Status: http.StatusTooManyRequests, Code: code}
+}

@@ -4,6 +4,7 @@ import (
 	"github.com/kidkender/prohealth-api/internal/config"
 	"github.com/kidkender/prohealth-api/internal/service"
 	"github.com/kidkender/prohealth-api/internal/worker"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
@@ -15,9 +16,10 @@ type Container struct {
 	HospitalService    *service.HospitalService
 	AdminService       *service.AdminService
 	OutboxWorker       *worker.OutboxWorker
+	RedisClient        *redis.Client
 }
 
-func New(db *gorm.DB, cfg *config.Config) *Container {
+func New(db *gorm.DB, cfg *config.Config) (*Container, error) {
 	mailService := service.NewMailService(
 		cfg.SMTPHost,
 		cfg.SMTPPort,
@@ -25,6 +27,11 @@ func New(db *gorm.DB, cfg *config.Config) *Container {
 		cfg.SMTPPassword,
 		cfg.MailFrom,
 	)
+
+	redisClient, err := NewRedisClient(config.NewRedisConfig())
+	if err != nil {
+		return nil, err
+	}
 
 	return &Container{
 		AuthService:        service.NewAuthService(db),
@@ -34,5 +41,6 @@ func New(db *gorm.DB, cfg *config.Config) *Container {
 		HospitalService:    service.NewHospitalService(db),
 		AdminService:       service.NewAdminService(db),
 		OutboxWorker:       worker.NewOutboxWorker(db, mailService),
-	}
+		RedisClient:        redisClient,
+	}, nil
 }

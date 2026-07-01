@@ -3,6 +3,8 @@ package apperror
 // General
 var ErrUnauthorized = Unauthorized("error.unauthorized")
 var ErrForbidden = Forbidden("error.forbidden")
+var ErrRateLimitExceeded = RateLimitExceeded("error.rate_limit.exceeded")
+var ErrInternalServerError = InternalServerError("error.internal_server_error")
 
 // Auth
 var ErrInvalidCredentials = Unauthorized("error.auth.invalid_credentials")

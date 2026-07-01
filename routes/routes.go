@@ -4,10 +4,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kidkender/prohealth-api/internal/container"
 	"github.com/kidkender/prohealth-api/internal/handler"
+	"github.com/kidkender/prohealth-api/internal/middleware"
+	"github.com/kidkender/prohealth-api/internal/ratelimit"
 )
 
-func RegisterRoutes(r *gin.Engine, c *container.Container) {
+func RegisterRoutes(r *gin.Engine, c *container.Container, authLimiter, apiLimiter *ratelimit.TokenBucket) {
 	api := r.Group("/api/v1")
+
+	api.GET("/health", handler.HealthCheck)
+
+	api.Use(middleware.RateLimitMiddleware(apiLimiter, middleware.BuildIPKey))
 
 	authHandler := handler.NewAuthHandler(c.AuthService)
 	userHandler := handler.NewUserHandler(c.UserService)
@@ -16,9 +22,7 @@ func RegisterRoutes(r *gin.Engine, c *container.Container) {
 	hospitalHandler := handler.NewHospitalHandler(c.HospitalService)
 	adminHandler := handler.NewAdminHandler(c.AdminService)
 
-
-	api.GET("/health", handler.HealthCheck)
-	RegisterAuthRoutes(api, authHandler)
+	RegisterAuthRoutes(api, authHandler, authLimiter)
 	RegisterUserRoutes(api, userHandler)
 	RegisterScheduleRoutes(api, scheduleHandler)
 	RegisterAppointmentRoutes(api, appointmentHandler)
