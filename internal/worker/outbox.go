@@ -2,27 +2,26 @@ package worker
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"log/slog"
 	"time"
 
 	"github.com/kidkender/prohealth-api/internal/model"
-	"github.com/kidkender/prohealth-api/internal/service"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
 const maxRetry = 3
 
 type OutboxWorker struct {
-	db          *gorm.DB
-	mailService *service.MailService
+	db    *gorm.DB
+	redis *redis.Client
 }
 
-func NewOutboxWorker(db *gorm.DB, mailService *service.MailService) *OutboxWorker {
+func NewOutboxWorker(db *gorm.DB, redis *redis.Client) *OutboxWorker {
 	return &OutboxWorker{
-		db:          db,
-		mailService: mailService,
+		db:    db,
+		redis: redis,
 	}
 }
 
@@ -53,46 +52,25 @@ func (w *OutboxWorker) process(ctx context.Context) {
 	}
 
 	for _, job := range jobs {
-		if err := w.handle(ctx, job); err != nil {
-			log.Printf("outbox: job %d failed: %v", job.ID, err)
-			w.db.WithContext(ctx).Model(&job).Updates(map[string]any{
-				"status":      model.OutboxJobStatusFailed,
-				"retry_count": job.RetryCount + 1,
-				"last_error":  err.Error(),
-			})
+		_, err := w.redis.XAdd(ctx, &redis.XAddArgs{
+			Stream: "stream:notifications",
+			Values: map[string]any{
+				"type":    job.Type,
+				"payload": job.Payload,
+			},
+		}).Result()
+
+		if err != nil {
+			w.db.WithContext(ctx).
+				Model(&job).
+				Updates(map[string]any{
+					"retry_count": job.RetryCount + 1,
+					"last_error":  err.Error(),
+				})
 			continue
 		}
+
 		slog.Info("outbox: job completed", "id", job.ID)
-		w.db.WithContext(ctx).Model(&job).Update("status", model.OutboxJobStatusCompleted)
+		w.db.WithContext(ctx).Model(&job).Update("status", model.OutboxJobStatusPublished)
 	}
-}
-
-func (w *OutboxWorker) handle(ctx context.Context, job model.OutboxJob) error {
-
-	switch model.OutboxJobType(job.Type) {
-	case model.OutboxJobTypeAppointmentCreated:
-		return w.handleAppointmentCreated(ctx, job.Payload)
-	default:
-		log.Printf("outbox: unknown job type %q, skipping", job.Type)
-		return nil
-	}
-}
-
-func (w *OutboxWorker) handleAppointmentCreated(ctx context.Context, payload []byte) error {
-	var p struct {
-		To     string `json:"to"`
-		Name   string `json:"name"`
-		Time   string `json:"time"`
-		Date   string `json:"date"`
-		Reason string `json:"reason"`
-	}
-	if err := json.Unmarshal(payload, &p); err != nil {
-		return err
-	}
-	return w.mailService.SendAppointmentCreated(ctx, p.To, service.AppointmentCreatedData{
-		PatientName:     p.Name,
-		ShiftDate:       p.Date,
-		AppointmentTime: p.Time,
-		Reason:          p.Reason,
-	})
 }

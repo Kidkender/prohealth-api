@@ -37,7 +37,7 @@ type AppointmentCreatedData struct {
 	Reason          string
 }
 
-func (s *MailService) SendAppointmentCreated(ctx context.Context, to string, data AppointmentCreatedData) error {
+func (s *MailService) SendAppointmentCreated(to string, data AppointmentCreatedData) error {
 	t, err := template.ParseFS(tmpl.MailFS, "mail/appointment_created.html")
 	if err != nil {
 		return fmt.Errorf("parse template: %w", err)

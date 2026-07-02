@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/kidkender/prohealth-api/internal/apperror"
+	"github.com/kidkender/prohealth-api/internal/cache"
 	"github.com/kidkender/prohealth-api/internal/dto"
 	"github.com/kidkender/prohealth-api/internal/model"
 	"github.com/kidkender/prohealth-api/internal/slug"
@@ -11,7 +13,8 @@ import (
 )
 
 type HospitalService struct {
-	db *gorm.DB
+	db    *gorm.DB
+	cache *cache.Cache
 }
 
 type HospitalWithRole struct {
@@ -19,8 +22,8 @@ type HospitalWithRole struct {
 	Role model.UserRole `gorm:"column:role"`
 }
 
-func NewHospitalService(db *gorm.DB) *HospitalService {
-	return &HospitalService{db: db}
+func NewHospitalService(db *gorm.DB, cache *cache.Cache) *HospitalService {
+	return &HospitalService{db: db, cache: cache}
 }
 
 func (s *HospitalService) CreateHospital(ctx context.Context, req dto.CreateHospitalRequest) error {
@@ -62,7 +65,14 @@ func (s *HospitalService) GetHospitalById(ctx context.Context, id uint) (*model.
 
 func (s *HospitalService) GetHospitals(ctx context.Context) ([]model.Hospital, error) {
 	var hospitals []model.Hospital
+	key := cache.ScheduleAllKey()
+	if hit, _ := s.cache.Get(ctx, key, &hospitals); hit {
+		return hospitals, nil
+	}
 	if err := s.db.WithContext(ctx).Find(&hospitals).Error; err != nil {
+		return nil, err
+	}
+	if err := s.cache.Set(ctx, key, hospitals, time.Minute); err != nil {
 		return nil, err
 	}
 	return hospitals, nil
@@ -117,21 +127,49 @@ func (s *HospitalService) GetHospitalMembers(ctx context.Context, hospitalID uin
 	return results, err
 }
 
+func (s *HospitalService) GetMemberRole(ctx context.Context, hospitalID, userID uint) (string, error) {
+	key := cache.MemberRoleKey(hospitalID, userID)
+	var role model.UserRole
+	if hit, _ := s.cache.Get(ctx, key, &role); hit {
+		return string(role), nil
+	}
+
+	var member model.HospitalMember
+	if err := s.db.WithContext(ctx).
+		Where("hospital_id = ? AND user_id = ?", hospitalID, userID).
+		First(&member).Error; err != nil {
+		return "", err
+	}
+
+	s.cache.Set(ctx, key, member.Role, 5*time.Minute)
+	return string(member.Role), nil
+}
+
 func (s *HospitalService) AddMemberByEmail(ctx context.Context, hospitalID uint, email string, role model.UserRole) error {
 	var user model.User
 	if err := s.db.WithContext(ctx).Where("email = ?", email).First(&user).Error; err != nil {
 		return apperror.ErrUserNotFound
 	}
 	member := model.HospitalMember{HospitalID: hospitalID, UserID: user.ID, Role: role}
-	return s.db.WithContext(ctx).
+	err := s.db.WithContext(ctx).
 		Where(model.HospitalMember{HospitalID: hospitalID, UserID: user.ID}).
 		FirstOrCreate(&member).Error
+
+	if err != nil {
+		s.cache.Delete(ctx, cache.MemberRoleKey(hospitalID, user.ID))
+	}
+	return err
+
 }
 
 func (s *HospitalService) RemoveMember(ctx context.Context, hospitalID uint, userID uint) error {
-	return s.db.WithContext(ctx).
+	err := s.db.WithContext(ctx).
 		Where("hospital_id = ? AND user_id = ?", hospitalID, userID).
 		Delete(&model.HospitalMember{}).Error
+	if err != nil {
+		s.cache.Delete(ctx, cache.MemberRoleKey(hospitalID, userID))
+	}
+	return err
 }
 
 func (s *HospitalService) GetHospitalByUser(ctx context.Context, userID uint) ([]HospitalWithRole, error) {

@@ -9,6 +9,7 @@ const (
 	OutboxJobStatusPending   OutboxJobStatus = "pending"
 	OutboxJobStatusCompleted OutboxJobStatus = "completed"
 	OutboxJobStatusFailed    OutboxJobStatus = "failed"
+	OutboxJobStatusPublished OutboxJobStatus = "published"
 )
 
 const (

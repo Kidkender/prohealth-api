@@ -42,7 +42,7 @@ func main() {
 	r.RedirectTrailingSlash = false
 	r.Use(middleware.CorsMiddleware(cfg.CORSOrigin))
 	r.Use(middleware.AuthMiddleware())
-	r.Use(middleware.TenantMiddleware(db))
+	r.Use(middleware.TenantMiddleware(c.HospitalService))
 
 	authLimiter, err := ratelimit.NewTokenBucket(c.RedisClient, ratelimit.Config{
 		Capacity:       10,

@@ -1,6 +1,7 @@
 package container
 
 import (
+	"github.com/kidkender/prohealth-api/internal/cache"
 	"github.com/kidkender/prohealth-api/internal/config"
 	"github.com/kidkender/prohealth-api/internal/service"
 	"github.com/kidkender/prohealth-api/internal/worker"
@@ -32,15 +33,16 @@ func New(db *gorm.DB, cfg *config.Config) (*Container, error) {
 	if err != nil {
 		return nil, err
 	}
+	cacheClient := cache.New(redisClient)
 
 	return &Container{
 		AuthService:        service.NewAuthService(db),
 		UserService:        service.NewUserService(db),
 		ScheduleService:    service.NewScheduleService(db),
 		AppointmentService: service.NewAppointmentService(db, mailService),
-		HospitalService:    service.NewHospitalService(db),
+		HospitalService:    service.NewHospitalService(db, cacheClient),
 		AdminService:       service.NewAdminService(db),
-		OutboxWorker:       worker.NewOutboxWorker(db, mailService),
+		OutboxWorker:       worker.NewOutboxWorker(db, redisClient),
 		RedisClient:        redisClient,
 	}, nil
 }
