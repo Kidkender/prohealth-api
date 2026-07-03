@@ -13,3 +13,7 @@ func ScheduleKey(hospitalID uint) string {
 func ScheduleAllKey() string {
 	return "schedule:all"
 }
+
+func LockSechduleKey(hospitalID uint) string {
+	return fmt.Sprintf("lock:schedule:generate:%d", hospitalID)
+}

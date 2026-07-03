@@ -13,4 +13,6 @@ func RegisterAuthRoutes(router gin.IRouter, authHandler *handler.AuthHandler, au
 	auth.POST("/register", authHandler.Register)
 	auth.POST("/login", authHandler.Login)
 	auth.PUT("/change-password", authHandler.ChangePassword)
+	auth.POST("/refresh-token", authHandler.RefreshToken)
+	auth.POST("/logout", authHandler.Logout)
 }

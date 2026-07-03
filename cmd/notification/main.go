@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/kidkender/prohealth-api/internal/cache"
 	"github.com/kidkender/prohealth-api/internal/config"
@@ -45,6 +46,14 @@ func main() {
 		log.Fatal(errClient)
 	}
 
-	notification.RunNotificationConsumer(ctx, redisClient, mailService)
+	consumer := notification.NewConsumer(
+		redisClient,
+		mailService,
+		cfg.ConsumerName,
+		5*time.Minute,
+		10,
+		30*time.Second,
+	)
+	consumer.Run(ctx)
 
 }

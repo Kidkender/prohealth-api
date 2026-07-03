@@ -21,6 +21,8 @@ type Config struct {
 	SMTPUsername string
 	SMTPPassword string
 	MailFrom     string
+
+	ConsumerName string
 }
 
 func requireEnv(key string) string {
@@ -56,6 +58,7 @@ func LoadEnv() *Config {
 		SMTPUsername: requireEnv("SMTP_USERNAME"),
 		SMTPPassword: requireEnv("SMTP_PASSWORD"),
 		MailFrom:     requireEnv("MAIL_FROM"),
+		ConsumerName: requireEnv("CONSUMER_NAME"),
 	}
 }
 

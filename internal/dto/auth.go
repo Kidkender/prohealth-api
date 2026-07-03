@@ -17,3 +17,11 @@ type ChangePasswordInput struct {
 	OldPassword string `json:"oldPassword" binding:"required,min=8"`
 	NewPassword string `json:"newPassword" binding:"required,min=8"`
 }
+
+type RefreshTokenInput struct {
+	RefreshToken string `json:"refreshToken" binding:"required"`
+}
+
+type LogoutInput struct {
+	RefreshToken string `json:"refreshToken" binding:"required"`
+}

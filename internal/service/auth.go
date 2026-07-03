@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/kidkender/prohealth-api/internal/apperror"
 	"github.com/kidkender/prohealth-api/internal/dto"
@@ -21,8 +22,9 @@ func NewAuthService(db *gorm.DB) *AuthService {
 }
 
 type AuthResult struct {
-	UserId uint   `json:"user_id"`
-	Token  string `json:"token"`
+	UserId       uint   `json:"user_id"`
+	Token        string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 func (s *AuthService) Register(
@@ -70,6 +72,8 @@ func (s *AuthService) Register(
 func (s *AuthService) Login(
 	ctx context.Context,
 	req *dto.LoginInput,
+	ip string,
+	userAgent string,
 ) (*AuthResult, error) {
 	var user model.User
 
@@ -85,15 +89,33 @@ func (s *AuthService) Login(
 
 	slog.Info("system role", "role", user.SystemRole)
 	claims := security.NewClaims(user.ID, user.SystemRole)
-	token, err := security.GenerateToken(claims)
+	accessToken, err := security.GenerateToken(claims)
 
 	if err != nil {
 		return nil, err
 	}
 
+	refreshToken, err := security.GenerateRandomToken()
+	if err != nil {
+		return nil, err
+	}
+
+	session := model.Session{
+		UserID:     user.ID,
+		TokenHash:  security.HashToken(refreshToken),
+		ExpiresAt:  time.Now().Add(7 * time.Hour),
+		IP:         ip,
+		UserAgent:  userAgent,
+		LastUsedAt: time.Now(),
+	}
+	if err := s.db.WithContext(ctx).Create(&session).Error; err != nil {
+		return nil, err
+	}
+
 	return &AuthResult{
-		UserId: user.ID,
-		Token:  token,
+		UserId:       user.ID,
+		Token:        accessToken,
+		RefreshToken: refreshToken,
 	}, nil
 }
 
@@ -122,4 +144,53 @@ func (s *AuthService) ChangePassword(
 	}
 
 	return nil
+}
+
+func (s *AuthService) RefreshToken(
+	ctx context.Context,
+	refreshToken string,
+) (*AuthResult, error) {
+	var session model.Session
+
+	if err := s.db.WithContext(ctx).Where("token_hash = ?", security.HashToken(refreshToken)).First(&session).Error; err != nil {
+		return nil, apperror.ErrInvalidToken
+	}
+
+	if session.Revoked {
+		s.db.WithContext(ctx).Where("user_id = ?", session.UserID).Update("revoked", true)
+		return nil, apperror.ErrTokenReused
+	}
+
+	if time.Now().After(session.ExpiresAt) {
+		return nil, apperror.ErrTokenExpired
+	}
+
+	var user model.User
+	if err := s.db.First(&user, session.UserID).Error; err != nil {
+		return nil, err
+	}
+	s.db.Model(&session).Update("revoked", true)
+	newRawToken, _ := security.GenerateRandomToken()
+	newSession := model.Session{
+		UserID:     session.UserID,
+		TokenHash:  security.HashToken(newRawToken),
+		ExpiresAt:  time.Now().Add(7 * 24 * time.Hour),
+		IP:         session.IP,
+		UserAgent:  session.UserAgent,
+		LastUsedAt: time.Now(),
+	}
+	s.db.Create(&newSession)
+	claims := security.NewClaims(user.ID, user.SystemRole)
+	accessToken, _ := security.GenerateToken(claims)
+
+	return &AuthResult{
+		UserId:       user.ID,
+		Token:        accessToken,
+		RefreshToken: newRawToken,
+	}, nil
+}
+
+func (s *AuthService) Logout(ctx context.Context, rawToken string) error {
+	hash := security.HashToken(rawToken)
+	return s.db.WithContext(ctx).Where("token_hash = ?", hash).Update("revoked", true).Error
 }

@@ -4,25 +4,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math/rand"
-	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/kidkender/prohealth-api/internal/apperror"
+	"github.com/kidkender/prohealth-api/internal/cache"
 	"github.com/kidkender/prohealth-api/internal/dto"
+	"github.com/kidkender/prohealth-api/internal/lock"
 	"github.com/kidkender/prohealth-api/internal/model"
 	"github.com/kidkender/prohealth-api/internal/timeutil"
 	"gorm.io/gorm"
 )
 
 type ScheduleService struct {
-	db         *gorm.DB
-	generateMu sync.Mutex
+	db   *gorm.DB
+	lock *lock.DistributedLock
 }
 
-func NewScheduleService(db *gorm.DB) *ScheduleService {
-	return &ScheduleService{db: db}
+func NewScheduleService(db *gorm.DB, lock *lock.DistributedLock) *ScheduleService {
+	return &ScheduleService{db: db, lock: lock}
 }
 
 func (s *ScheduleService) CreateSchedulePeriod(ctx context.Context, hospitalID uint, payload dto.CreateScheduleInput) error {
@@ -330,8 +332,20 @@ func (s *ScheduleService) GetScheduleShiftByDoctor(ctx context.Context, hospital
 func (s *ScheduleService) GenerateSchedule(
 	ctx context.Context, hospitalID uint, payload dto.GenerateScheduleInput,
 ) (*dto.GenerateScheduleResponse, error) {
-	s.generateMu.Lock()
-	defer s.generateMu.Unlock()
+	key := cache.LockSechduleKey(hospitalID)
+
+	lockValue, err := s.lock.Acquire(ctx, key, 30*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("acquire schedule lock: %w", err)
+	}
+	if lockValue == "" {
+		return nil, apperror.ErrSchedulePeriodGenerating
+	}
+	defer func() {
+		if err := s.lock.Release(ctx, key, lockValue); err != nil {
+			slog.Error("failed to release lock", "error", err)
+		}
+	}()
 
 	monday := timeutil.NextMonday(payload.StartDate)
 	friday := monday.AddDate(0, 0, 4)

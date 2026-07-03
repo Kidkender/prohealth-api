@@ -12,19 +12,39 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const (
-	consumerName  = "consumer-1"
-	minIdleTime   = 5 * time.Minute
-	reclaimBatch  = 10
-	reclaimTicker = 30 * time.Second
-)
-
-func RunNotificationConsumer(ctx context.Context, redisClient *redis.Client, mailService *service.MailService) {
-	go recoverPendingMessages(ctx, redisClient, mailService)
-	consumeNewMessages(ctx, redisClient, mailService)
+type NotificationConsumer struct {
+	redisClient   *redis.Client
+	mailService   *service.MailService
+	consumerName  string
+	minIdleTime   time.Duration
+	reclaimBatch  int
+	reclaimTicker time.Duration
 }
 
-func consumeNewMessages(ctx context.Context, redisClient *redis.Client, mailService *service.MailService) {
+func NewConsumer(
+	redisClient *redis.Client,
+	mailService *service.MailService,
+	consumerName string,
+	minIdleTime time.Duration,
+	reclaimBatch int,
+	reclaimTicker time.Duration,
+) *NotificationConsumer {
+	return &NotificationConsumer{
+		redisClient:   redisClient,
+		mailService:   mailService,
+		consumerName:  consumerName,
+		minIdleTime:   minIdleTime,
+		reclaimBatch:  reclaimBatch,
+		reclaimTicker: reclaimTicker,
+	}
+}
+
+func (c *NotificationConsumer) Run(ctx context.Context) {
+	go c.recoverPendingMessages(ctx)
+	c.consumeNewMessages(ctx)
+}
+
+func (c *NotificationConsumer) consumeNewMessages(ctx context.Context) {
 
 	for {
 		select {
@@ -34,9 +54,9 @@ func consumeNewMessages(ctx context.Context, redisClient *redis.Client, mailServ
 		default:
 		}
 
-		entries, err := redisClient.XReadGroup(ctx, &redis.XReadGroupArgs{
+		entries, err := c.redisClient.XReadGroup(ctx, &redis.XReadGroupArgs{
 			Group:    string(cache.NotificationGroup),
-			Consumer: consumerName,
+			Consumer: c.consumerName,
 			Streams:  []string{string(cache.StreamNotifications), ">"},
 			Block:    5 * time.Second,
 			Count:    10,
@@ -54,18 +74,16 @@ func consumeNewMessages(ctx context.Context, redisClient *redis.Client, mailServ
 		}
 		for _, entry := range entries {
 			for _, message := range entry.Messages {
-				processMessage(ctx, redisClient, mailService, message)
+				c.processMessage(ctx, message)
 			}
 		}
 	}
 }
 
-func recoverPendingMessages(
+func (c *NotificationConsumer) recoverPendingMessages(
 	ctx context.Context,
-	redisClient *redis.Client,
-	mailService *service.MailService,
 ) {
-	ticker := time.NewTicker(reclaimTicker)
+	ticker := time.NewTicker(c.reclaimTicker)
 	defer ticker.Stop()
 
 	for {
@@ -78,13 +96,13 @@ func recoverPendingMessages(
 
 		start := "0"
 		for {
-			entries, nextStart, err := redisClient.XAutoClaim(ctx, &redis.XAutoClaimArgs{
+			entries, nextStart, err := c.redisClient.XAutoClaim(ctx, &redis.XAutoClaimArgs{
 				Stream:   string(cache.StreamNotifications),
 				Group:    string(cache.NotificationGroup),
-				Consumer: consumerName,
-				MinIdle:  minIdleTime,
+				Consumer: c.consumerName,
+				MinIdle:  c.minIdleTime,
 				Start:    start,
-				Count:    reclaimBatch,
+				Count:    int64(c.reclaimBatch),
 			}).Result()
 			if err != nil {
 				slog.Info("xautoclaim error", "err", err)
@@ -93,7 +111,7 @@ func recoverPendingMessages(
 
 			for _, entry := range entries {
 				slog.Info("reclaiming abandoned message", "id", entry.ID)
-				processMessage(ctx, redisClient, mailService, entry)
+				c.processMessage(ctx, entry)
 			}
 
 			if nextStart == "0" || len(entries) == 0 {
@@ -104,28 +122,26 @@ func recoverPendingMessages(
 	}
 }
 
-func processMessage(
+func (c *NotificationConsumer) processMessage(
 	ctx context.Context,
-	redisClient *redis.Client,
-	mailService *service.MailService,
 	entry redis.XMessage,
 ) {
 	payloadStr, ok := entry.Values["payload"].(string)
 	if !ok {
 		slog.Error("invalid payload, acking to drop poison message", "id", entry.ID)
-		redisClient.XAck(ctx, string(cache.StreamNotifications), string(cache.NotificationGroup), entry.ID)
+		c.redisClient.XAck(ctx, string(cache.StreamNotifications), string(cache.NotificationGroup), entry.ID)
 		return
 	}
 
 	jobType, _ := entry.Values["type"].(string)
 	payload := []byte(payloadStr)
 
-	if err := handleNotification(model.OutboxJobType(jobType), payload, mailService); err != nil {
+	if err := handleNotification(model.OutboxJobType(jobType), payload, c.mailService); err != nil {
 		slog.Error("handle notification error", "err", err, "id", entry.ID)
 		return
 	}
 
-	redisClient.XAck(ctx, string(cache.StreamNotifications), string(cache.NotificationGroup), entry.ID)
+	c.redisClient.XAck(ctx, string(cache.StreamNotifications), string(cache.NotificationGroup), entry.ID)
 }
 
 func handleNotification(

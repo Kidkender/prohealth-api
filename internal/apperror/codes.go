@@ -9,6 +9,9 @@ var ErrInternalServerError = InternalServerError("error.internal_server_error")
 // Auth
 var ErrInvalidCredentials = Unauthorized("error.auth.invalid_credentials")
 var ErrInvalidToken = Unauthorized("error.auth.invalid_token")
+var ErrTokenRevoked = Unauthorized("error.auth.token_revoked")
+var ErrTokenReused = Unauthorized("error.auth.token_reused")
+var ErrTokenExpired = Unauthorized("error.auth.token_expired")
 
 // User
 var ErrUserExists = Conflict("error.user.already_exists")
@@ -32,3 +35,5 @@ var ErrDoctorAlreadyAssigned = Conflict("error.schedule.doctor.already_assigned"
 
 // Appointment
 var ErrAppointmentNotFound = NotFound("error.appointment.not_found")
+
+var ErrSchedulePeriodGenerating = Conflict("error.schedule.period.generating")
