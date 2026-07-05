@@ -1,9 +1,12 @@
 package container
 
 import (
+	"log/slog"
+
 	"github.com/kidkender/prohealth-api/internal/cache"
 	"github.com/kidkender/prohealth-api/internal/config"
 	"github.com/kidkender/prohealth-api/internal/lock"
+	"github.com/kidkender/prohealth-api/internal/logger"
 	"github.com/kidkender/prohealth-api/internal/service"
 	"github.com/kidkender/prohealth-api/internal/worker"
 	"github.com/redis/go-redis/v9"
@@ -19,6 +22,7 @@ type Container struct {
 	AdminService       *service.AdminService
 	OutboxWorker       *worker.OutboxWorker
 	RedisClient        *redis.Client
+	Logger             *slog.Logger
 }
 
 func New(db *gorm.DB, cfg *config.Config) (*Container, error) {
@@ -40,6 +44,8 @@ func New(db *gorm.DB, cfg *config.Config) (*Container, error) {
 		return nil, err
 	}
 
+	logger := logger.New()
+
 	return &Container{
 		AuthService:        service.NewAuthService(db),
 		UserService:        service.NewUserService(db),
@@ -49,5 +55,6 @@ func New(db *gorm.DB, cfg *config.Config) (*Container, error) {
 		AdminService:       service.NewAdminService(db),
 		OutboxWorker:       worker.NewOutboxWorker(db, redisClient),
 		RedisClient:        redisClient,
+		Logger:             logger,
 	}, nil
 }

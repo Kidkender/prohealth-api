@@ -6,9 +6,15 @@ import (
 	"github.com/kidkender/prohealth-api/internal/handler"
 	"github.com/kidkender/prohealth-api/internal/middleware"
 	"github.com/kidkender/prohealth-api/internal/ratelimit"
+	"github.com/redis/go-redis/v9"
 )
 
-func RegisterRoutes(r *gin.Engine, c *container.Container, authLimiter, apiLimiter *ratelimit.TokenBucket) {
+func RegisterRoutes(
+	r *gin.Engine,
+	c *container.Container,
+	authLimiter, apiLimiter *ratelimit.TokenBucket,
+	redisClient *redis.Client,
+) {
 	api := r.Group("/api/v1")
 
 	api.GET("/health", handler.HealthCheck)
@@ -25,7 +31,7 @@ func RegisterRoutes(r *gin.Engine, c *container.Container, authLimiter, apiLimit
 	RegisterAuthRoutes(api, authHandler, authLimiter)
 	RegisterUserRoutes(api, userHandler)
 	RegisterScheduleRoutes(api, scheduleHandler)
-	RegisterAppointmentRoutes(api, appointmentHandler)
+	RegisterAppointmentRoutes(api, appointmentHandler, redisClient)
 	RegisterHospitalRoutes(api, hospitalHandler)
 	RegisterAdminRoutes(api, adminHandler)
 }

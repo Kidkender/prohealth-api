@@ -17,3 +17,7 @@ func ScheduleAllKey() string {
 func LockSechduleKey(hospitalID uint) string {
 	return fmt.Sprintf("lock:schedule:generate:%d", hospitalID)
 }
+
+func IdempotencyKey(scope, path, key string) string {
+	return fmt.Sprintf("idempotency:%s:%s:%s", scope, path, key)
+}

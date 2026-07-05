@@ -38,8 +38,11 @@ func main() {
 	log.Println("outbox worker started")
 	go c.OutboxWorker.Run(ctx)
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
 	r.RedirectTrailingSlash = false
+	r.Use(middleware.RequestIDMiddleware())
+	r.Use(middleware.AccessLogMiddleware(c.Logger))
 	r.Use(middleware.CorsMiddleware(cfg.CORSOrigin))
 	r.Use(middleware.AuthMiddleware())
 	r.Use(middleware.TenantMiddleware(c.HospitalService))
@@ -61,7 +64,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	routes.RegisterRoutes(r, c, authLimiter, apiLimiter)
+	routes.RegisterRoutes(r, c, authLimiter, apiLimiter, c.RedisClient)
 	port := cfg.Port
 	if port == "" {
 		port = "8080"
