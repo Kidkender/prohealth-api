@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/kidkender/prohealth-api/internal/container"
 	"github.com/kidkender/prohealth-api/internal/handler"
@@ -17,6 +19,7 @@ func RegisterRoutes(
 ) {
 	api := r.Group("/api/v1")
 
+	api.Use(middleware.TimeoutMiddleware(5 * time.Second))
 	api.GET("/health", handler.HealthCheck)
 
 	api.Use(middleware.RateLimitMiddleware(apiLimiter, middleware.BuildIPKey))

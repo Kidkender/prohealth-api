@@ -28,7 +28,7 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 		hospitalID = hospitalIDVal.(uint)
 	}
 
-	result, err := h.userService.GetUser(c, userId, hospitalID)
+	result, err := h.userService.GetUser(c.Request.Context(), userId, hospitalID)
 	if err != nil {
 		apperror.HandleError(c, err)
 		return
@@ -44,7 +44,7 @@ func (h *UserHandler) AssignRole(c *gin.Context) {
 		return
 	}
 	hospitalID := context.HospitalId(c)
-	if err := h.userService.AssignRole(c, hospitalID, payload); err != nil {
+	if err := h.userService.AssignRole(c.Request.Context(), hospitalID, payload); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}

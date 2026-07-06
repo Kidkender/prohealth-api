@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"html/template"
 	"log/slog"
+	"net"
 	"net/smtp"
+	"time"
 
 	tmpl "github.com/kidkender/prohealth-api/internal/template"
+	"github.com/sony/gobreaker/v2"
 )
 
 type MailService struct {
@@ -18,15 +21,29 @@ type MailService struct {
 	username string
 	password string
 	from     string
+	breaker  *gobreaker.CircuitBreaker[any]
 }
 
 func NewMailService(host, port, username, password, from string) *MailService {
+	circuitBreakder := gobreaker.NewCircuitBreaker[any](gobreaker.Settings{
+		Name:        "smtp",
+		MaxRequests: 1,
+		Interval:    60 * time.Second,
+		Timeout:     30 * time.Second,
+		ReadyToTrip: func(counts gobreaker.Counts) bool {
+			return counts.ConsecutiveFailures >= 5
+		},
+		OnStateChange: func(name string, from, to gobreaker.State) {
+			slog.Warn("circuit breaker change : ", "name", name, "from", from, "to", to)
+		},
+	})
 	return &MailService{
 		host:     host,
 		port:     port,
 		username: username,
 		password: password,
 		from:     from,
+		breaker:  circuitBreakder,
 	}
 }
 
@@ -37,7 +54,7 @@ type AppointmentCreatedData struct {
 	Reason          string
 }
 
-func (s *MailService) SendAppointmentCreated(to string, data AppointmentCreatedData) error {
+func (s *MailService) SendAppointmentCreated(ctx context.Context, to string, data AppointmentCreatedData) error {
 	t, err := template.ParseFS(tmpl.MailFS, "mail/appointment_created.html")
 	if err != nil {
 		return fmt.Errorf("parse template: %w", err)
@@ -48,19 +65,40 @@ func (s *MailService) SendAppointmentCreated(to string, data AppointmentCreatedD
 		return fmt.Errorf("render template: %w", err)
 	}
 
-	return s.send(to, "Xác nhận lịch hẹn - ProHealth", buf.String())
+	return s.send(ctx, to, "Xác nhận lịch hẹn - ProHealth", buf.String())
 }
 
 func (s *MailService) Send(ctx context.Context, to string, subject string, body string) error {
-	return s.send(to, subject, body)
+	return s.send(ctx, to, subject, body)
 }
 
-func (s *MailService) send(to, subject, body string) error {
+func (s *MailService) send(ctx context.Context, to, subject, body string) error {
+	_, err := s.breaker.Execute(func() (any, error) {
+		return nil, s.doSend(ctx, to, subject, body)
+	})
+	return err
+}
+
+func (s *MailService) doSend(ctx context.Context, to, subject, body string) error {
 	addr := fmt.Sprintf("%s:%s", s.host, s.port)
 
-	conn, err := tls.Dial("tcp", addr, &tls.Config{ServerName: s.host})
+	dialer := &net.Dialer{
+		Timeout: 5 * time.Second,
+	}
+	conn, err := tls.DialWithDialer(
+		dialer,
+		"tcp",
+		addr,
+		&tls.Config{ServerName: s.host})
 	if err != nil {
 		return fmt.Errorf("smtp dial tls: %w", err)
+	}
+
+	deadline, ok := ctx.Deadline()
+	if ok {
+		conn.SetDeadline(deadline)
+	} else {
+		conn.SetDeadline(time.Now().Add(10 * time.Second))
 	}
 
 	client, err := smtp.NewClient(conn, s.host)
@@ -69,7 +107,11 @@ func (s *MailService) send(to, subject, body string) error {
 	}
 	defer client.Close()
 
-	if err := client.Auth(smtp.PlainAuth("", s.username, s.password, s.host)); err != nil {
+	if err := client.Auth(
+		smtp.PlainAuth("",
+			s.username,
+			s.password, s.host,
+		)); err != nil {
 		return fmt.Errorf("smtp auth: %w", err)
 	}
 	if err := client.Mail(s.from); err != nil {

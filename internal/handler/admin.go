@@ -20,7 +20,7 @@ func NewAdminHandler(service *service.AdminService) *AdminHandler {
 }
 
 func (h *AdminHandler) GetAdminDashboard(ctx *gin.Context) {
-	dashboard, err := h.service.GetSystemStat(ctx)
+	dashboard, err := h.service.GetSystemStat(ctx.Request.Context())
 	if err != nil {
 		apperror.HandleError(ctx, err)
 		return

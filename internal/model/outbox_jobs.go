@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"github.com/kidkender/prohealth-api/internal/cache"
+)
 
 type OutboxJobStatus string
 type OutboxJobType string
@@ -25,4 +29,13 @@ type OutboxJob struct {
 	LastError  string          `json:"last_error"`
 	CreatedAt  time.Time       `json:"created_at"`
 	UpdatedAt  time.Time       `json:"updated_at"`
+}
+
+func (t OutboxJobType) Stream() string {
+	switch t {
+	case OutboxJobTypeAppointmentCreated:
+		return string(cache.StreamNotifications)
+	default:
+		return string(cache.StreamNotifications)
+	}
 }

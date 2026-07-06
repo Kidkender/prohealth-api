@@ -136,7 +136,7 @@ func (c *NotificationConsumer) processMessage(
 	jobType, _ := entry.Values["type"].(string)
 	payload := []byte(payloadStr)
 
-	if err := handleNotification(model.OutboxJobType(jobType), payload, c.mailService); err != nil {
+	if err := handleNotification(ctx, model.OutboxJobType(jobType), payload, c.mailService); err != nil {
 		slog.Error("handle notification error", "err", err, "id", entry.ID)
 		return
 	}
@@ -145,13 +145,14 @@ func (c *NotificationConsumer) processMessage(
 }
 
 func handleNotification(
+	ctx context.Context,
 	jobType model.OutboxJobType,
 	payload []byte,
 	mailService *service.MailService,
 ) error {
 	switch jobType {
 	case model.OutboxJobTypeAppointmentCreated:
-		return handleAppointmentCreated(mailService, payload)
+		return handleAppointmentCreated(ctx, mailService, payload)
 	default:
 		slog.Info("Unknow job type")
 		return fmt.Errorf("unknown job type: %s", jobType)

@@ -2,14 +2,16 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"time"
 
 	"github.com/kidkender/prohealth-api/internal/apperror"
+	"github.com/kidkender/prohealth-api/internal/audit"
 	"github.com/kidkender/prohealth-api/internal/dto"
+	"github.com/kidkender/prohealth-api/internal/event"
 	"github.com/kidkender/prohealth-api/internal/model"
+	"github.com/kidkender/prohealth-api/internal/outbox"
 	"github.com/kidkender/prohealth-api/internal/timeutil"
 	"gorm.io/gorm"
 )
@@ -29,15 +31,16 @@ type AppointmentResult struct {
 type AppointmentService struct {
 	db   *gorm.DB
 	mail *MailService
+	pub  *outbox.Publisher
 }
 
-func NewAppointmentService(db *gorm.DB, mail *MailService) *AppointmentService {
-	return &AppointmentService{db: db, mail: mail}
+func NewAppointmentService(db *gorm.DB, mail *MailService, pub *outbox.Publisher) *AppointmentService {
+	return &AppointmentService{db: db, mail: mail, pub: pub}
 }
 
 func (s *AppointmentService) CreateAppointment(ctx context.Context, payload dto.CreateAppointmentInput, hospitalID uint) error {
 	var shift model.ScheduleShift
-	if err := s.db.First(&shift, payload.ShiftID).Error; err != nil {
+	if err := s.db.WithContext(ctx).First(&shift, payload.ShiftID).Error; err != nil {
 		return err
 	}
 
@@ -45,7 +48,7 @@ func (s *AppointmentService) CreateAppointment(ctx context.Context, payload dto.
 	if t, err := time.Parse(time.RFC3339, payload.AppointmentTime); err == nil {
 		appointmentTime = t.Format("15:04")
 	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 
 		appointment := model.Appointment{
 			ShiftID:         payload.ShiftID,
@@ -59,24 +62,18 @@ func (s *AppointmentService) CreateAppointment(ctx context.Context, payload dto.
 		if err := tx.Create(&appointment).Error; err != nil {
 			return err
 		}
-
-		jobPayload, _ := json.Marshal(map[string]string{
-			"to":     payload.PatientEmail,
-			"name":   payload.PatientName,
-			"time":   appointmentTime,
-			"date":   shift.Date.Format("2006-01-02"),
-			"reason": string(payload.Reason),
-		})
-
-		if err := tx.Create(&model.OutboxJob{
-			Type:    string(model.OutboxJobTypeAppointmentCreated),
-			Status:  model.OutboxJobStatusPending,
-			Payload: jobPayload,
-		}).Error; err != nil {
+		if err := audit.Record(tx, hospitalID, nil, model.ActionCreate, "appointment", appointment.ID); err != nil {
 			return err
 		}
-
-		return nil
+		return s.pub.Publish(tx, event.AppointmentCreated{
+			AppointmentID: appointment.ID,
+			ActorID:       nil,
+			PatientName:   payload.PatientName,
+			PatientEmail:  payload.PatientEmail,
+			Reason:        string(payload.Reason),
+			Date:          shift.Date.Format("2006-01-02"),
+			Time:          appointmentTime,
+		})
 	})
 }
 

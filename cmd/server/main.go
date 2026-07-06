@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -37,6 +38,8 @@ func main() {
 
 	log.Println("outbox worker started")
 	go c.OutboxWorker.Run(ctx)
+
+	slog.SetDefault(c.Logger)
 
 	r := gin.New()
 	r.Use(gin.Recovery())

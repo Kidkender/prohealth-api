@@ -27,7 +27,7 @@ func (h *AppointmentHandler) RegisterAppointment(ctx *gin.Context) {
 		apperror.ValidationError(ctx, err)
 		return
 	}
-	if err := h.appointmentService.CreateAppointment(ctx, req, hospitalID); err != nil {
+	if err := h.appointmentService.CreateAppointment(ctx.Request.Context(), req, hospitalID); err != nil {
 		apperror.HandleError(ctx, err)
 		return
 	}
@@ -40,7 +40,7 @@ func (h *AppointmentHandler) GetAppointments(ctx *gin.Context) {
 		apperror.ValidationError(ctx, err)
 		return
 	}
-	appointments, total, err := h.appointmentService.GetAppointments(ctx, context.HospitalId(ctx), query)
+	appointments, total, err := h.appointmentService.GetAppointments(ctx.Request.Context(), context.HospitalId(ctx), query)
 	if err != nil {
 		apperror.HandleError(ctx, err)
 		return
@@ -60,7 +60,7 @@ func (h *AppointmentHandler) UpdateAppointment(c *gin.Context) {
 	}
 	callerID := context.UserId(c)
 	callerRole := model.UserRole(context.HospitalRole(c))
-	if err := h.appointmentService.UpdateAppointment(c, id, callerID, callerRole, req); err != nil {
+	if err := h.appointmentService.UpdateAppointment(c.Request.Context(), id, callerID, callerRole, req); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
@@ -74,7 +74,7 @@ func (h *AppointmentHandler) GetAppointmentByMe(ctx *gin.Context) {
 		apperror.ValidationError(ctx, err)
 		return
 	}
-	appointments, err := h.appointmentService.GetAppointmentDoctor(ctx, context.HospitalId(ctx), userID, &filter)
+	appointments, err := h.appointmentService.GetAppointmentDoctor(ctx.Request.Context(), context.HospitalId(ctx), userID, &filter)
 	if err != nil {
 		apperror.HandleError(ctx, err)
 		return

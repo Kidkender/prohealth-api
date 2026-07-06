@@ -27,7 +27,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	err := h.authService.Register(c, &req)
+	err := h.authService.Register(c.Request.Context(), &req)
 	if err != nil {
 		apperror.HandleError(c, err)
 		return
@@ -46,7 +46,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	slog.Info("login request", "email", req.Email)
 
-	result, err := h.authService.Login(c, &req, c.ClientIP(), c.Request.UserAgent())
+	result, err := h.authService.Login(c.Request.Context(), &req, c.ClientIP(), c.Request.UserAgent())
 	if err != nil {
 		apperror.HandleError(c, err)
 		return
@@ -63,7 +63,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	}
 
 	userID := context.UserId(c)
-	err := h.authService.ChangePassword(c, userID, &req)
+	err := h.authService.ChangePassword(c.Request.Context(), userID, &req)
 	if err != nil {
 		apperror.HandleError(c, err)
 		return
@@ -79,7 +79,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	result, err := h.authService.RefreshToken(c, req.RefreshToken)
+	result, err := h.authService.RefreshToken(c.Request.Context(), req.RefreshToken)
 	if err != nil {
 		apperror.HandleError(c, err)
 		return
@@ -95,7 +95,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		return
 	}
 
-	if err := h.authService.Logout(c, req.RefreshToken); err != nil {
+	if err := h.authService.Logout(c.Request.Context(), req.RefreshToken); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}

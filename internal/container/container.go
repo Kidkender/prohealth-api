@@ -7,8 +7,8 @@ import (
 	"github.com/kidkender/prohealth-api/internal/config"
 	"github.com/kidkender/prohealth-api/internal/lock"
 	"github.com/kidkender/prohealth-api/internal/logger"
+	"github.com/kidkender/prohealth-api/internal/outbox"
 	"github.com/kidkender/prohealth-api/internal/service"
-	"github.com/kidkender/prohealth-api/internal/worker"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
@@ -20,9 +20,10 @@ type Container struct {
 	AppointmentService *service.AppointmentService
 	HospitalService    *service.HospitalService
 	AdminService       *service.AdminService
-	OutboxWorker       *worker.OutboxWorker
+	OutboxWorker       *outbox.OutboxWorker
 	RedisClient        *redis.Client
 	Logger             *slog.Logger
+	Publisher          *outbox.Publisher
 }
 
 func New(db *gorm.DB, cfg *config.Config) (*Container, error) {
@@ -45,15 +46,16 @@ func New(db *gorm.DB, cfg *config.Config) (*Container, error) {
 	}
 
 	logger := logger.New()
+	publisher := outbox.NewPublisher()
 
 	return &Container{
 		AuthService:        service.NewAuthService(db),
 		UserService:        service.NewUserService(db),
 		ScheduleService:    service.NewScheduleService(db, distLock),
-		AppointmentService: service.NewAppointmentService(db, mailService),
+		AppointmentService: service.NewAppointmentService(db, mailService, publisher),
 		HospitalService:    service.NewHospitalService(db, cacheClient),
 		AdminService:       service.NewAdminService(db),
-		OutboxWorker:       worker.NewOutboxWorker(db, redisClient),
+		OutboxWorker:       outbox.NewOutboxWorker(db, redisClient),
 		RedisClient:        redisClient,
 		Logger:             logger,
 	}, nil

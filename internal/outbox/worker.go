@@ -1,4 +1,4 @@
-package worker
+package outbox
 
 import (
 	"context"
@@ -53,7 +53,7 @@ func (w *OutboxWorker) process(ctx context.Context) {
 
 	for _, job := range jobs {
 		_, err := w.redis.XAdd(ctx, &redis.XAddArgs{
-			Stream: "stream:notifications",
+			Stream: model.OutboxJobType(job.Type).Stream(),
 			Values: map[string]any{
 				"type":    job.Type,
 				"payload": job.Payload,
