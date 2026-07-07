@@ -10,7 +10,7 @@ import (
 func RegisterHospitalRoutes(router gin.IRouter, handler *handler.HospitalHandler) {
 	hospital := router.Group("/hospital")
 	hospital.GET("", handler.GetHospitals)
-	hospital.POST("", middleware.RequireSystemRole(model.SystemRoleAdmin), handler.CreateHospital)
+	hospital.POST("", handler.CreateHospital)
 	hospital.GET("/me", handler.GetHospitalByMe)
 	hospital.GET("/members", middleware.RequireRole(model.RoleAdmin), handler.GetMembers)
 	hospital.POST("/members", middleware.RequireRole(model.RoleAdmin), handler.AddMember)
@@ -18,4 +18,5 @@ func RegisterHospitalRoutes(router gin.IRouter, handler *handler.HospitalHandler
 	hospital.GET("/:id/doctors", handler.GetHospitalDoctors)
 	hospital.GET("/:id", handler.GetHospitalByID)
 	hospital.PUT("/:id", middleware.RequireSystemRole(model.SystemRoleAdmin), handler.UpdateHospital)
+	hospital.DELETE("/:id", middleware.RequireSystemRole(model.SystemRoleAdmin), handler.DeleteHospital)
 }

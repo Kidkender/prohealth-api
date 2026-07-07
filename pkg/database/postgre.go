@@ -6,6 +6,7 @@ import (
 	"github.com/kidkender/prohealth-api/internal/config"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func NewPostgresDB() (*gorm.DB, error) {
@@ -18,5 +19,10 @@ func NewPostgresDB() (*gorm.DB, error) {
 		config.GetEnv("DB_NAME"),
 		config.GetEnv("DB_SSLMODE"),
 	)
-	return gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	return gorm.Open(
+		postgres.Open(dsn),
+		&gorm.Config{
+			Logger: logger.Default.LogMode(logger.Info),
+		},
+	)
 }

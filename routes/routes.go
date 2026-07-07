@@ -29,7 +29,8 @@ func RegisterRoutes(
 	scheduleHandler := handler.NewScheduleHandler(c.ScheduleService)
 	appointmentHandler := handler.NewAppointmentHandler(c.AppointmentService)
 	hospitalHandler := handler.NewHospitalHandler(c.HospitalService)
-	adminHandler := handler.NewAdminHandler(c.AdminService)
+	adminHandler := handler.NewAdminHandler(c.AdminService, c.UserService, c.AuditService, c.HospitalService)
+	departmentHandler := handler.NewDepartmentHandler(c.DepartmentService)
 
 	RegisterAuthRoutes(api, authHandler, authLimiter)
 	RegisterUserRoutes(api, userHandler)
@@ -37,4 +38,5 @@ func RegisterRoutes(
 	RegisterAppointmentRoutes(api, appointmentHandler, redisClient)
 	RegisterHospitalRoutes(api, hospitalHandler)
 	RegisterAdminRoutes(api, adminHandler)
+	RegisterDepartmentRoutes(api, departmentHandler)
 }

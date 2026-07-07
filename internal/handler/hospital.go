@@ -35,7 +35,8 @@ func (h *HospitalHandler) CreateHospital(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
-	if err := h.service.CreateHospital(c.Request.Context(), payload); err != nil {
+	requesterID := context.UserId(c)
+	if err := h.service.CreateHospital(c.Request.Context(), requesterID, payload); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
@@ -66,6 +67,18 @@ func (h *HospitalHandler) UpdateHospital(c *gin.Context) {
 		return
 	}
 	if err := h.service.UpdateHospital(c.Request.Context(), id, payload); err != nil {
+		apperror.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, response.Done())
+}
+
+func (h *HospitalHandler) DeleteHospital(c *gin.Context) {
+	id, ok := context.ParseParamUint(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.service.DeleteHospital(c.Request.Context(), id); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}

@@ -87,6 +87,13 @@ func (s *AuthService) Login(
 		return nil, apperror.ErrInvalidCredentials
 	}
 
+	switch user.UserStatus {
+	case model.UserStatusBanned:
+		return nil, apperror.ErrUserBanned
+	case model.UserStatusInactive:
+		return nil, apperror.ErrUserInactive
+	}
+
 	slog.Info("system role", "role", user.SystemRole)
 	claims := security.NewClaims(user.ID, user.SystemRole)
 	accessToken, err := security.GenerateToken(claims)

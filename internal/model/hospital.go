@@ -10,12 +10,21 @@ const (
 	RoleUser   UserRole = "user"
 )
 
+type HospitalStatus string
+
+const (
+	HospitalStatusPending  HospitalStatus = "pending"
+	HospitalStatusApproved HospitalStatus = "approved"
+	HospitalStatusRejected HospitalStatus = "rejected"
+)
+
 type Hospital struct {
-	ID          uint   `gorm:"primaryKey"`
-	Name        string `gorm:"not null"`
-	Slug        string `gorm:"unique;not null"`
+	ID          uint           `gorm:"primaryKey"`
+	Name        string         `gorm:"not null"`
+	Slug        string         `gorm:"unique;not null"`
 	Description string
 	Address     string
+	Status      HospitalStatus `gorm:"not null;default:approved"`
 
 	Members      []HospitalMember `gorm:"foreignKey:HospitalID"`
 	Periods      []SchedulePeriod `gorm:"foreignKey:HospitalID"`

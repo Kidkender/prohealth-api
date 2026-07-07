@@ -20,6 +20,8 @@ type Container struct {
 	AppointmentService *service.AppointmentService
 	HospitalService    *service.HospitalService
 	AdminService       *service.AdminService
+	AuditService       *service.AuditService
+	DepartmentService  *service.DepartmentService
 	OutboxWorker       *outbox.OutboxWorker
 	RedisClient        *redis.Client
 	Logger             *slog.Logger
@@ -55,6 +57,8 @@ func New(db *gorm.DB, cfg *config.Config) (*Container, error) {
 		AppointmentService: service.NewAppointmentService(db, mailService, publisher),
 		HospitalService:    service.NewHospitalService(db, cacheClient),
 		AdminService:       service.NewAdminService(db),
+		AuditService:       service.NewAuditService(db),
+		DepartmentService:  service.NewDepartmentService(db),
 		OutboxWorker:       outbox.NewOutboxWorker(db, redisClient),
 		RedisClient:        redisClient,
 		Logger:             logger,

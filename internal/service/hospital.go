@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/kidkender/prohealth-api/internal/apperror"
@@ -26,7 +27,7 @@ func NewHospitalService(db *gorm.DB, cache *cache.Cache) *HospitalService {
 	return &HospitalService{db: db, cache: cache}
 }
 
-func (s *HospitalService) CreateHospital(ctx context.Context, req dto.CreateHospitalRequest) error {
+func (s *HospitalService) CreateHospital(ctx context.Context, requesterID uint, req dto.CreateHospitalRequest) error {
 	generatedSlug := slug.From(req.Name)
 	var count int64
 	if err := s.db.WithContext(ctx).Model(&model.Hospital{}).
@@ -38,13 +39,50 @@ func (s *HospitalService) CreateHospital(ctx context.Context, req dto.CreateHosp
 		return apperror.ErrHospitalSlugAlreadyExists
 	}
 
-	hospital := model.Hospital{
-		Name:        req.Name,
-		Description: req.Description,
-		Address:     req.Address,
-		Slug:        generatedSlug,
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		hospital := model.Hospital{
+			Name:        req.Name,
+			Description: req.Description,
+			Address:     req.Address,
+			Slug:        generatedSlug,
+			Status:      model.HospitalStatusPending,
+		}
+		if err := tx.Create(&hospital).Error; err != nil {
+			return err
+		}
+
+		member := model.HospitalMember{
+			HospitalID: hospital.ID,
+			UserID:     requesterID,
+			Role:       model.RoleAdmin,
+		}
+		return tx.Create(&member).Error
+	})
+}
+
+func (s *HospitalService) UpdateHospitalStatus(ctx context.Context, id uint, status model.HospitalStatus) error {
+	hospital, err := s.GetHospitalById(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperror.ErrHospitalNotFound
+		}
+		return err
 	}
-	return s.db.WithContext(ctx).Create(&hospital).Error
+
+	hospital.Status = status
+	return s.db.WithContext(ctx).Save(hospital).Error
+}
+
+func (s *HospitalService) GetHospitalsByStatus(ctx context.Context, status *model.HospitalStatus) ([]model.Hospital, error) {
+	query := s.db.WithContext(ctx).Model(&model.Hospital{})
+	if status != nil {
+		query = query.Where("hospital_status = ?", *status)
+	}
+	var hospitals []model.Hospital
+	if err := query.Order("created_at DESC").Find(&hospitals).Error; err != nil {
+		return nil, err
+	}
+	return hospitals, nil
 }
 
 func (s *HospitalService) GetHospitalBySlug(ctx context.Context, hospitalSlug string) (*model.Hospital, error) {
@@ -69,7 +107,7 @@ func (s *HospitalService) GetHospitals(ctx context.Context) ([]model.Hospital, e
 	if hit, _ := s.cache.Get(ctx, key, &hospitals); hit {
 		return hospitals, nil
 	}
-	if err := s.db.WithContext(ctx).Find(&hospitals).Error; err != nil {
+	if err := s.db.WithContext(ctx).Where("hospital_status = ?", model.HospitalStatusApproved).Find(&hospitals).Error; err != nil {
 		return nil, err
 	}
 	if err := s.cache.Set(ctx, key, hospitals, time.Minute); err != nil {
@@ -90,6 +128,34 @@ func (s *HospitalService) UpdateHospital(ctx context.Context, id uint, req dto.U
 		hospital.Address = req.Address
 	}
 	return s.db.WithContext(ctx).Save(hospital).Error
+}
+
+func (s *HospitalService) DeleteHospital(ctx context.Context, id uint) error {
+	if _, err := s.GetHospitalById(ctx, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperror.ErrHospitalNotFound
+		}
+		return err
+	}
+
+	var dependents int64
+	if err := s.db.WithContext(ctx).Model(&model.Appointment{}).
+		Where("hospital_id = ?", id).Count(&dependents).Error; err != nil {
+		return err
+	}
+	if dependents > 0 {
+		return apperror.ErrHospitalHasDependents
+	}
+
+	if err := s.db.WithContext(ctx).Model(&model.SchedulePeriod{}).
+		Where("hospital_id = ?", id).Count(&dependents).Error; err != nil {
+		return err
+	}
+	if dependents > 0 {
+		return apperror.ErrHospitalHasDependents
+	}
+
+	return s.db.WithContext(ctx).Delete(&model.Hospital{}, id).Error
 }
 
 type HospitalDoctor struct {

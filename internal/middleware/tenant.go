@@ -24,6 +24,7 @@ func TenantMiddleware(hospitalService *service.HospitalService) gin.HandlerFunc 
 		{http.MethodGet, "/api/v1/schedule/period/:id/shift"}: true,
 		{http.MethodPost, "/api/v1/appointments/"}:            true,
 		{http.MethodGet, "/api/v1/admin/stats"}:               true,
+		{http.MethodGet, "/api/v1/admin/users"}:               true,
 	}
 
 	return func(c *gin.Context) {

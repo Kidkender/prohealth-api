@@ -6,3 +6,14 @@ type AssignRoleRequest struct {
 	Role   model.UserRole `json:"role" binding:"required,oneof=admin user doctor"`
 	UserID uint           `json:"user_id"`
 }
+
+type FilterUser struct {
+	PaginationQuery
+	HospitalID   *uint           `form:"hospital_id"`
+	Role         *model.UserRole `form:"role"`
+	DepartmentID *uint           `form:"department_id"`
+}
+
+type UpdateUserStatusRequest struct {
+	Status model.UserStatus `json:"status" binding:"required,oneof=active inactive banned"`
+}
