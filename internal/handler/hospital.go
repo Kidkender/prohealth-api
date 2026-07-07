@@ -66,7 +66,8 @@ func (h *HospitalHandler) UpdateHospital(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
-	if err := h.service.UpdateHospital(c.Request.Context(), id, payload); err != nil {
+	actorID := context.UserId(c)
+	if err := h.service.UpdateHospital(c.Request.Context(), actorID, id, payload); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
@@ -78,7 +79,8 @@ func (h *HospitalHandler) DeleteHospital(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.service.DeleteHospital(c.Request.Context(), id); err != nil {
+	actorID := context.UserId(c)
+	if err := h.service.DeleteHospital(c.Request.Context(), actorID, id); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
@@ -118,7 +120,8 @@ func (h *HospitalHandler) AddMember(c *gin.Context) {
 		return
 	}
 	hospitalID := context.HospitalId(c)
-	if err := h.service.AddMemberByEmail(c.Request.Context(), hospitalID, payload.Email, payload.Role); err != nil {
+	actorID := context.UserId(c)
+	if err := h.service.AddMemberByEmail(c.Request.Context(), actorID, hospitalID, payload.Email, payload.Role); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
@@ -131,7 +134,8 @@ func (h *HospitalHandler) RemoveMember(c *gin.Context) {
 		return
 	}
 	hospitalID := context.HospitalId(c)
-	if err := h.service.RemoveMember(c.Request.Context(), hospitalID, userID); err != nil {
+	actorID := context.UserId(c)
+	if err := h.service.RemoveMember(c.Request.Context(), actorID, hospitalID, userID); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}

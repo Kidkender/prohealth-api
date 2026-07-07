@@ -26,7 +26,7 @@ func (h *ScheduleHandler) CreatePeriod(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
-	if err := h.scheduleService.CreateSchedulePeriod(c.Request.Context(), context.HospitalId(c), req); err != nil {
+	if err := h.scheduleService.CreateSchedulePeriod(c.Request.Context(), context.UserId(c), context.HospitalId(c), req); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
@@ -39,7 +39,7 @@ func (h *ScheduleHandler) CreateShift(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
-	if err := h.scheduleService.CreateScheduleShift(c.Request.Context(), context.HospitalId(c), req); err != nil {
+	if err := h.scheduleService.CreateScheduleShift(c.Request.Context(), context.UserId(c), context.HospitalId(c), req); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
@@ -52,7 +52,7 @@ func (h *ScheduleHandler) SetDoctorShift(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
-	if err := h.scheduleService.SetDoctorForShift(c.Request.Context(), req); err != nil {
+	if err := h.scheduleService.SetDoctorForShift(c.Request.Context(), context.UserId(c), req); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
@@ -69,7 +69,7 @@ func (h *ScheduleHandler) UpdatePeriod(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
-	if err := h.scheduleService.UpdateSchedulePeriod(c.Request.Context(), uint(id), req); err != nil {
+	if err := h.scheduleService.UpdateSchedulePeriod(c.Request.Context(), context.UserId(c), uint(id), req); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
@@ -168,7 +168,7 @@ func (h *ScheduleHandler) DeleteSchedulePeriod(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.scheduleService.DeleteSchedulePeriod(c.Request.Context(), id); err != nil {
+	if err := h.scheduleService.DeleteSchedulePeriod(c.Request.Context(), context.UserId(c), id); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
@@ -180,7 +180,7 @@ func (h *ScheduleHandler) DeleteScheduleShift(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.scheduleService.DeleteScheduleShift(c.Request.Context(), id); err != nil {
+	if err := h.scheduleService.DeleteScheduleShift(c.Request.Context(), context.UserId(c), id); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
@@ -197,7 +197,7 @@ func (h *ScheduleHandler) GenerateSchedule(c *gin.Context) {
 		return
 	}
 	slog.Info("GenerateSchedule 2", "req", req)
-	result, err := h.scheduleService.GenerateSchedule(c.Request.Context(), context.HospitalId(c), req)
+	result, err := h.scheduleService.GenerateSchedule(c.Request.Context(), context.UserId(c), context.HospitalId(c), req)
 	if err != nil {
 		apperror.HandleError(c, err)
 		slog.Error("GenerateSchedule 2", "err", err)
@@ -218,7 +218,7 @@ func (h *ScheduleHandler) ReplaceDoctorsForShift(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
-	if err := h.scheduleService.ReplaceDoctorsForShift(c.Request.Context(), uint(id), payload.DoctorIDs); err != nil {
+	if err := h.scheduleService.ReplaceDoctorsForShift(c.Request.Context(), context.UserId(c), uint(id), payload.DoctorIDs); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
@@ -235,7 +235,7 @@ func (h *ScheduleHandler) UpdateScheduleShift(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.scheduleService.UpdateScheduleShift(c.Request.Context(), uint(id), req); err != nil {
+	if err := h.scheduleService.UpdateScheduleShift(c.Request.Context(), context.UserId(c), uint(id), req); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}

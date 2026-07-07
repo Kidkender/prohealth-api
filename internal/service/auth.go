@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kidkender/prohealth-api/internal/apperror"
+	"github.com/kidkender/prohealth-api/internal/audit"
 	"github.com/kidkender/prohealth-api/internal/dto"
 	"github.com/kidkender/prohealth-api/internal/model"
 	"github.com/kidkender/prohealth-api/internal/security"
@@ -146,11 +147,12 @@ func (s *AuthService) ChangePassword(
 	}
 
 	user.Password = string(hash)
-	if err := s.db.Save(&user).Error; err != nil {
-		return err
-	}
-
-	return nil
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&user).Error; err != nil {
+			return err
+		}
+		return audit.Record(tx, 0, &userID, model.ActionUpdate, "password", userID)
+	})
 }
 
 func (s *AuthService) RefreshToken(

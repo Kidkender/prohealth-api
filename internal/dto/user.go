@@ -9,9 +9,11 @@ type AssignRoleRequest struct {
 
 type FilterUser struct {
 	PaginationQuery
-	HospitalID   *uint           `form:"hospital_id"`
-	Role         *model.UserRole `form:"role"`
-	DepartmentID *uint           `form:"department_id"`
+	HospitalID   *uint             `form:"hospital_id"`
+	Role         *model.UserRole   `form:"role"`
+	DepartmentID *uint             `form:"department_id"`
+	Status       *model.UserStatus `form:"status"`
+	Search       *string           `form:"search"`
 }
 
 type UpdateUserStatusRequest struct {

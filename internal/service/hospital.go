@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kidkender/prohealth-api/internal/apperror"
+	"github.com/kidkender/prohealth-api/internal/audit"
 	"github.com/kidkender/prohealth-api/internal/cache"
 	"github.com/kidkender/prohealth-api/internal/dto"
 	"github.com/kidkender/prohealth-api/internal/model"
@@ -56,11 +57,15 @@ func (s *HospitalService) CreateHospital(ctx context.Context, requesterID uint, 
 			UserID:     requesterID,
 			Role:       model.RoleAdmin,
 		}
-		return tx.Create(&member).Error
+		if err := tx.Create(&member).Error; err != nil {
+			return err
+		}
+
+		return audit.Record(tx, hospital.ID, &requesterID, model.ActionCreate, "hospital", hospital.ID)
 	})
 }
 
-func (s *HospitalService) UpdateHospitalStatus(ctx context.Context, id uint, status model.HospitalStatus) error {
+func (s *HospitalService) UpdateHospitalStatus(ctx context.Context, actorID uint, id uint, status model.HospitalStatus) error {
 	hospital, err := s.GetHospitalById(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -70,7 +75,12 @@ func (s *HospitalService) UpdateHospitalStatus(ctx context.Context, id uint, sta
 	}
 
 	hospital.Status = status
-	return s.db.WithContext(ctx).Save(hospital).Error
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(hospital).Error; err != nil {
+			return err
+		}
+		return audit.Record(tx, id, &actorID, model.ActionUpdate, "hospital_status", id)
+	})
 }
 
 func (s *HospitalService) GetHospitalsByStatus(ctx context.Context, status *model.HospitalStatus) ([]model.Hospital, error) {
@@ -116,7 +126,7 @@ func (s *HospitalService) GetHospitals(ctx context.Context) ([]model.Hospital, e
 	return hospitals, nil
 }
 
-func (s *HospitalService) UpdateHospital(ctx context.Context, id uint, req dto.UpdateHospitalRequest) error {
+func (s *HospitalService) UpdateHospital(ctx context.Context, actorID uint, id uint, req dto.UpdateHospitalRequest) error {
 	hospital, err := s.GetHospitalById(ctx, id)
 	if err != nil {
 		return err
@@ -127,10 +137,15 @@ func (s *HospitalService) UpdateHospital(ctx context.Context, id uint, req dto.U
 	if req.Address != "" {
 		hospital.Address = req.Address
 	}
-	return s.db.WithContext(ctx).Save(hospital).Error
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(hospital).Error; err != nil {
+			return err
+		}
+		return audit.Record(tx, id, &actorID, model.ActionUpdate, "hospital", id)
+	})
 }
 
-func (s *HospitalService) DeleteHospital(ctx context.Context, id uint) error {
+func (s *HospitalService) DeleteHospital(ctx context.Context, actorID uint, id uint) error {
 	if _, err := s.GetHospitalById(ctx, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return apperror.ErrHospitalNotFound
@@ -155,7 +170,12 @@ func (s *HospitalService) DeleteHospital(ctx context.Context, id uint) error {
 		return apperror.ErrHospitalHasDependents
 	}
 
-	return s.db.WithContext(ctx).Delete(&model.Hospital{}, id).Error
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&model.Hospital{}, id).Error; err != nil {
+			return err
+		}
+		return audit.Record(tx, id, &actorID, model.ActionDelete, "hospital", id)
+	})
 }
 
 type HospitalDoctor struct {
@@ -211,27 +231,37 @@ func (s *HospitalService) GetMemberRole(ctx context.Context, hospitalID, userID 
 	return string(member.Role), nil
 }
 
-func (s *HospitalService) AddMemberByEmail(ctx context.Context, hospitalID uint, email string, role model.UserRole) error {
+func (s *HospitalService) AddMemberByEmail(ctx context.Context, actorID uint, hospitalID uint, email string, role model.UserRole) error {
 	var user model.User
 	if err := s.db.WithContext(ctx).Where("email = ?", email).First(&user).Error; err != nil {
 		return apperror.ErrUserNotFound
 	}
-	member := model.HospitalMember{HospitalID: hospitalID, UserID: user.ID, Role: role}
-	err := s.db.WithContext(ctx).
-		Where(model.HospitalMember{HospitalID: hospitalID, UserID: user.ID}).
-		FirstOrCreate(&member).Error
+
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		member := model.HospitalMember{HospitalID: hospitalID, UserID: user.ID, Role: role}
+		if err := tx.
+			Where(model.HospitalMember{HospitalID: hospitalID, UserID: user.ID}).
+			FirstOrCreate(&member).Error; err != nil {
+			return err
+		}
+		return audit.Record(tx, hospitalID, &actorID, model.ActionCreate, "hospital_member", user.ID)
+	})
 
 	if err != nil {
 		s.cache.Delete(ctx, cache.MemberRoleKey(hospitalID, user.ID))
 	}
 	return err
-
 }
 
-func (s *HospitalService) RemoveMember(ctx context.Context, hospitalID uint, userID uint) error {
-	err := s.db.WithContext(ctx).
-		Where("hospital_id = ? AND user_id = ?", hospitalID, userID).
-		Delete(&model.HospitalMember{}).Error
+func (s *HospitalService) RemoveMember(ctx context.Context, actorID uint, hospitalID uint, userID uint) error {
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.
+			Where("hospital_id = ? AND user_id = ?", hospitalID, userID).
+			Delete(&model.HospitalMember{}).Error; err != nil {
+			return err
+		}
+		return audit.Record(tx, hospitalID, &actorID, model.ActionDelete, "hospital_member", userID)
+	})
 	if err != nil {
 		s.cache.Delete(ctx, cache.MemberRoleKey(hospitalID, userID))
 	}

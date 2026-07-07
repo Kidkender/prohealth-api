@@ -17,13 +17,27 @@ func NewAuditService(db *gorm.DB) *AuditService {
 }
 
 func (s *AuditService) GetUserActivity(ctx context.Context, userID uint, filter dto.FilterAuditLog) ([]model.AuditLog, int64, error) {
-	query := s.db.WithContext(ctx).Model(&model.AuditLog{}).Where("actor_id = ?", userID)
+	filter.ActorID = &userID
+	return s.ListAuditLogs(ctx, filter)
+}
 
+func (s *AuditService) ListAuditLogs(ctx context.Context, filter dto.FilterAuditLog) ([]model.AuditLog, int64, error) {
+	query := s.db.WithContext(ctx).Model(&model.AuditLog{})
+
+	if filter.ActorID != nil {
+		query = query.Where("actor_id = ?", *filter.ActorID)
+	}
+	if filter.HospitalID != nil {
+		query = query.Where("hospital_id = ?", *filter.HospitalID)
+	}
 	if filter.Action != nil {
 		query = query.Where("action = ?", *filter.Action)
 	}
 	if filter.EntityType != nil {
 		query = query.Where("entity_type = ?", *filter.EntityType)
+	}
+	if filter.EntityID != nil {
+		query = query.Where("entity_id = ?", *filter.EntityID)
 	}
 	if filter.From != nil {
 		query = query.Where("created_at >= ?", *filter.From)

@@ -24,7 +24,7 @@ type Hospital struct {
 	Slug        string         `gorm:"unique;not null"`
 	Description string
 	Address     string
-	Status      HospitalStatus `gorm:"not null;default:approved"`
+	Status      HospitalStatus `gorm:"column:hospital_status;not null;default:approved"`
 
 	Members      []HospitalMember `gorm:"foreignKey:HospitalID"`
 	Periods      []SchedulePeriod `gorm:"foreignKey:HospitalID"`

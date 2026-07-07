@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/kidkender/prohealth-api/internal/apperror"
+	"github.com/kidkender/prohealth-api/internal/audit"
 	"github.com/kidkender/prohealth-api/internal/dto"
 	"github.com/kidkender/prohealth-api/internal/model"
 	"gorm.io/gorm"
@@ -18,7 +19,7 @@ func NewDepartmentService(db *gorm.DB) *DepartmentService {
 	return &DepartmentService{db: db}
 }
 
-func (s *DepartmentService) CreateDepartment(ctx context.Context, req dto.CreateDepartmentRequest) (*model.Department, error) {
+func (s *DepartmentService) CreateDepartment(ctx context.Context, actorID uint, req dto.CreateDepartmentRequest) (*model.Department, error) {
 	var count int64
 	if err := s.db.WithContext(ctx).Model(&model.Department{}).
 		Where("name = ?", req.Name).Count(&count).Error; err != nil {
@@ -29,7 +30,13 @@ func (s *DepartmentService) CreateDepartment(ctx context.Context, req dto.Create
 	}
 
 	department := model.Department{Name: req.Name}
-	if err := s.db.WithContext(ctx).Create(&department).Error; err != nil {
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&department).Error; err != nil {
+			return err
+		}
+		return audit.Record(tx, 0, &actorID, model.ActionCreate, "department", department.ID)
+	})
+	if err != nil {
 		return nil, err
 	}
 	return &department, nil
@@ -54,7 +61,7 @@ func (s *DepartmentService) GetDepartmentByID(ctx context.Context, id uint) (*mo
 	return &department, nil
 }
 
-func (s *DepartmentService) UpdateDepartment(ctx context.Context, id uint, req dto.UpdateDepartmentRequest) (*model.Department, error) {
+func (s *DepartmentService) UpdateDepartment(ctx context.Context, actorID uint, id uint, req dto.UpdateDepartmentRequest) (*model.Department, error) {
 	department, err := s.GetDepartmentByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -72,13 +79,19 @@ func (s *DepartmentService) UpdateDepartment(ctx context.Context, id uint, req d
 	}
 
 	department.Name = req.Name
-	if err := s.db.WithContext(ctx).Save(department).Error; err != nil {
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(department).Error; err != nil {
+			return err
+		}
+		return audit.Record(tx, 0, &actorID, model.ActionUpdate, "department", id)
+	})
+	if err != nil {
 		return nil, err
 	}
 	return department, nil
 }
 
-func (s *DepartmentService) DeleteDepartment(ctx context.Context, id uint) error {
+func (s *DepartmentService) DeleteDepartment(ctx context.Context, actorID uint, id uint) error {
 	if _, err := s.GetDepartmentByID(ctx, id); err != nil {
 		return err
 	}
@@ -100,5 +113,10 @@ func (s *DepartmentService) DeleteDepartment(ctx context.Context, id uint) error
 		return apperror.ErrDepartmentInUse
 	}
 
-	return s.db.WithContext(ctx).Delete(&model.Department{}, id).Error
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&model.Department{}, id).Error; err != nil {
+			return err
+		}
+		return audit.Record(tx, 0, &actorID, model.ActionDelete, "department", id)
+	})
 }

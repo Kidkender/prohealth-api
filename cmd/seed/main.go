@@ -82,6 +82,7 @@ func main() {
 		if err != nil {
 			return err
 		}
+
 		admin := model.User{Email: "admin@prohealth.com", Password: string(adminHash), SystemRole: model.SystemRoleAdmin}
 		if res := tx.Where(model.User{Email: admin.Email}).FirstOrCreate(&admin); res.Error != nil {
 			return res.Error

@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/kidkender/prohealth-api/internal/apperror"
+	"github.com/kidkender/prohealth-api/internal/audit"
 	"github.com/kidkender/prohealth-api/internal/cache"
 	"github.com/kidkender/prohealth-api/internal/dto"
 	"github.com/kidkender/prohealth-api/internal/lock"
@@ -27,22 +28,28 @@ func NewScheduleService(db *gorm.DB, lock *lock.DistributedLock) *ScheduleServic
 	return &ScheduleService{db: db, lock: lock}
 }
 
-func (s *ScheduleService) CreateSchedulePeriod(ctx context.Context, hospitalID uint, payload dto.CreateScheduleInput) error {
+func (s *ScheduleService) CreateSchedulePeriod(ctx context.Context, actorID uint, hospitalID uint, payload dto.CreateScheduleInput) error {
 
 	if payload.StartDate.After(payload.EndDate) {
 		return apperror.ErrInvalidTimeRange
 	}
 
-	return s.db.WithContext(ctx).Create(&model.SchedulePeriod{
+	period := model.SchedulePeriod{
 		Name:       payload.Name,
 		StartDate:  payload.StartDate,
 		EndDate:    payload.EndDate,
 		Status:     payload.Status,
 		HospitalID: hospitalID,
-	}).Error
+	}
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&period).Error; err != nil {
+			return err
+		}
+		return audit.Record(tx, hospitalID, &actorID, model.ActionCreate, "schedule_period", period.ID)
+	})
 }
 
-func (s *ScheduleService) CreateScheduleShift(ctx context.Context, hospitalID uint, payload dto.CreateScheduleShiftInput) error {
+func (s *ScheduleService) CreateScheduleShift(ctx context.Context, actorID uint, hospitalID uint, payload dto.CreateScheduleShiftInput) error {
 	var period model.SchedulePeriod
 	if err := s.db.WithContext(ctx).First(&period, payload.PeriodID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -74,11 +81,17 @@ func (s *ScheduleService) CreateScheduleShift(ctx context.Context, hospitalID ui
 		HospitalID:   hospitalID,
 	}
 
-	return s.db.WithContext(ctx).Create(&shift).Error
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&shift).Error; err != nil {
+			return err
+		}
+		return audit.Record(tx, hospitalID, &actorID, model.ActionCreate, "schedule_shift", shift.ID)
+	})
 }
 
-func (s *ScheduleService) ReplaceDoctorsForShift(ctx context.Context, shiftID uint, doctorIDs []uint) error {
-	if err := s.db.WithContext(ctx).First(&model.ScheduleShift{}, shiftID).Error; err != nil {
+func (s *ScheduleService) ReplaceDoctorsForShift(ctx context.Context, actorID uint, shiftID uint, doctorIDs []uint) error {
+	var shift model.ScheduleShift
+	if err := s.db.WithContext(ctx).First(&shift, shiftID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return apperror.ErrScheduleShiftNotFound
 		}
@@ -93,33 +106,36 @@ func (s *ScheduleService) ReplaceDoctorsForShift(ctx context.Context, shiftID ui
 				return err
 			}
 		}
-		return nil
+		return audit.Record(tx, shift.HospitalID, &actorID, model.ActionUpdate, "schedule_shift_doctors", shiftID)
 	})
 }
 
-func (s *ScheduleService) SetDoctorForShift(ctx context.Context, payload dto.SetDoctorForShiftInput) error {
-	if err := s.db.WithContext(ctx).First(&model.ScheduleShift{}, payload.ShiftID).Error; err != nil {
+func (s *ScheduleService) SetDoctorForShift(ctx context.Context, actorID uint, payload dto.SetDoctorForShiftInput) error {
+	var shift model.ScheduleShift
+	if err := s.db.WithContext(ctx).First(&shift, payload.ShiftID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return apperror.ErrScheduleShiftNotFound
 		}
 		return err
 	}
 
-	err := s.db.WithContext(ctx).Create(&model.ScheduleShiftDoctor{
-		ShiftID: payload.ShiftID,
-		UserID:  payload.DoctorID,
-	}).Error
-	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return apperror.ErrDoctorAlreadyAssigned
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		err := tx.Create(&model.ScheduleShiftDoctor{
+			ShiftID: payload.ShiftID,
+			UserID:  payload.DoctorID,
+		}).Error
+		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+				return apperror.ErrDoctorAlreadyAssigned
+			}
+			return err
 		}
-		return err
-	}
-	return nil
+		return audit.Record(tx, shift.HospitalID, &actorID, model.ActionCreate, "schedule_shift_doctor", payload.ShiftID)
+	})
 }
 
-func (s *ScheduleService) UpdateSchedulePeriod(ctx context.Context, id uint, payload dto.UpdateSchedulePeriodInput) error {
+func (s *ScheduleService) UpdateSchedulePeriod(ctx context.Context, actorID uint, id uint, payload dto.UpdateSchedulePeriodInput) error {
 	var period model.SchedulePeriod
 	if err := s.db.WithContext(ctx).First(&period, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -135,7 +151,12 @@ func (s *ScheduleService) UpdateSchedulePeriod(ctx context.Context, id uint, pay
 	period.Status = payload.Status
 	period.StartDate = payload.StartDate
 	period.EndDate = payload.EndDate
-	return s.db.Save(&period).Error
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&period).Error; err != nil {
+			return err
+		}
+		return audit.Record(tx, period.HospitalID, &actorID, model.ActionUpdate, "schedule_period", id)
+	})
 }
 
 func (s *ScheduleService) GetSchedulePeriods(ctx context.Context, hospitalID uint, filter dto.FilterSchedulePeriod) ([]model.SchedulePeriod, int64, error) {
@@ -249,7 +270,7 @@ func (s *ScheduleService) GetScheduleShiftById(ctx context.Context, id uint) (*m
 	return &shift, nil
 }
 
-func (s *ScheduleService) DeleteSchedulePeriod(ctx context.Context, periodID uint) error {
+func (s *ScheduleService) DeleteSchedulePeriod(ctx context.Context, actorID uint, periodID uint) error {
 	var period model.SchedulePeriod
 
 	if err := s.db.WithContext(ctx).First(&period, periodID).Error; err != nil {
@@ -265,10 +286,15 @@ func (s *ScheduleService) DeleteSchedulePeriod(ctx context.Context, periodID uin
 		return apperror.ErrSchedulePeriodHasShifts
 	}
 
-	return s.db.WithContext(ctx).Delete(&period).Error
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&period).Error; err != nil {
+			return err
+		}
+		return audit.Record(tx, period.HospitalID, &actorID, model.ActionDelete, "schedule_period", periodID)
+	})
 }
 
-func (s *ScheduleService) DeleteScheduleShift(ctx context.Context, shiftID uint) error {
+func (s *ScheduleService) DeleteScheduleShift(ctx context.Context, actorID uint, shiftID uint) error {
 	var shift model.ScheduleShift
 	if err := s.db.WithContext(ctx).First(&shift, shiftID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -277,10 +303,23 @@ func (s *ScheduleService) DeleteScheduleShift(ctx context.Context, shiftID uint)
 		return err
 	}
 
-	return s.db.WithContext(ctx).Delete(&shift).Error
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&shift).Error; err != nil {
+			return err
+		}
+		return audit.Record(tx, shift.HospitalID, &actorID, model.ActionDelete, "schedule_shift", shiftID)
+	})
 }
 
-func (s *ScheduleService) UpdateScheduleShift(ctx context.Context, shiftID uint, payload dto.UpdateScheduleShiftInput) error {
+func (s *ScheduleService) UpdateScheduleShift(ctx context.Context, actorID uint, shiftID uint, payload dto.UpdateScheduleShiftInput) error {
+	var shift model.ScheduleShift
+	if err := s.db.WithContext(ctx).First(&shift, shiftID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperror.ErrScheduleShiftNotFound
+		}
+		return err
+	}
+
 	updates := map[string]any{}
 
 	if payload.Status != nil {
@@ -293,19 +332,19 @@ func (s *ScheduleService) UpdateScheduleShift(ctx context.Context, shiftID uint,
 		updates["note"] = *payload.Note
 	}
 
-	result := s.db.WithContext(ctx).
-		Model(&model.ScheduleShift{}).
-		Where("id = ?", shiftID).
-		Updates(updates)
-	if result.Error != nil {
-		return result.Error
-	}
-
-	if result.RowsAffected == 0 {
-		return apperror.ErrScheduleShiftNotFound
-	}
-	return nil
-
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		result := tx.
+			Model(&model.ScheduleShift{}).
+			Where("id = ?", shiftID).
+			Updates(updates)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return apperror.ErrScheduleShiftNotFound
+		}
+		return audit.Record(tx, shift.HospitalID, &actorID, model.ActionUpdate, "schedule_shift", shiftID)
+	})
 }
 
 func (s *ScheduleService) GetScheduleShiftByDoctor(ctx context.Context, hospitalID uint, doctorID uint, filter *dto.FilterScheduleShift) ([]model.ScheduleShift, error) {
@@ -330,7 +369,7 @@ func (s *ScheduleService) GetScheduleShiftByDoctor(ctx context.Context, hospital
 }
 
 func (s *ScheduleService) GenerateSchedule(
-	ctx context.Context, hospitalID uint, payload dto.GenerateScheduleInput,
+	ctx context.Context, actorID uint, hospitalID uint, payload dto.GenerateScheduleInput,
 ) (*dto.GenerateScheduleResponse, error) {
 	key := cache.LockSechduleKey(hospitalID)
 
@@ -488,7 +527,7 @@ func (s *ScheduleService) GenerateSchedule(
 				}
 			}
 		}
-		return nil
+		return audit.Record(tx, hospitalID, &actorID, model.ActionCreate, "schedule_period_generated", period.ID)
 	}); err != nil {
 		return nil, err
 	}

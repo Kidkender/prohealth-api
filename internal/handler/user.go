@@ -44,7 +44,8 @@ func (h *UserHandler) AssignRole(c *gin.Context) {
 		return
 	}
 	hospitalID := context.HospitalId(c)
-	if err := h.userService.AssignRole(c.Request.Context(), hospitalID, payload); err != nil {
+	actorID := context.UserId(c)
+	if err := h.userService.AssignRole(c.Request.Context(), actorID, hospitalID, payload); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}

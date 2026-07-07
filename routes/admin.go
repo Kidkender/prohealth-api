@@ -19,4 +19,5 @@ func RegisterAdminRoutes(r gin.IRouter, h *handler.AdminHandler) {
 	admin.GET("/hospitals/:id/members", h.GetHospitalMembers)
 	admin.POST("/hospitals/:id/members", h.AddHospitalMember)
 	admin.DELETE("/hospitals/:id/members/:userId", h.RemoveHospitalMember)
+	admin.GET("/audit-logs", h.ListAuditLogs)
 }

@@ -124,7 +124,8 @@ func (h *AdminHandler) UpdateHospitalStatus(ctx *gin.Context) {
 		return
 	}
 
-	if err := h.hospitalService.UpdateHospitalStatus(ctx.Request.Context(), hospitalID, req.Status); err != nil {
+	actorID := appcontext.UserId(ctx)
+	if err := h.hospitalService.UpdateHospitalStatus(ctx.Request.Context(), actorID, hospitalID, req.Status); err != nil {
 		apperror.HandleError(ctx, err)
 		return
 	}
@@ -159,7 +160,8 @@ func (h *AdminHandler) AddHospitalMember(ctx *gin.Context) {
 		return
 	}
 
-	if err := h.hospitalService.AddMemberByEmail(ctx.Request.Context(), hospitalID, req.Email, req.Role); err != nil {
+	actorID := appcontext.UserId(ctx)
+	if err := h.hospitalService.AddMemberByEmail(ctx.Request.Context(), actorID, hospitalID, req.Email, req.Role); err != nil {
 		apperror.HandleError(ctx, err)
 		return
 	}
@@ -177,7 +179,8 @@ func (h *AdminHandler) RemoveHospitalMember(ctx *gin.Context) {
 		return
 	}
 
-	if err := h.hospitalService.RemoveMember(ctx.Request.Context(), hospitalID, userID); err != nil {
+	actorID := appcontext.UserId(ctx)
+	if err := h.hospitalService.RemoveMember(ctx.Request.Context(), actorID, hospitalID, userID); err != nil {
 		apperror.HandleError(ctx, err)
 		return
 	}
@@ -203,6 +206,27 @@ func (h *AdminHandler) GetUserActivity(ctx *gin.Context) {
 	}
 
 	logs, count, err := h.auditService.GetUserActivity(ctx.Request.Context(), targetUserID, filter)
+	if err != nil {
+		apperror.HandleError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, response.Paginated(logs, count, filter.Page, filter.Limit))
+}
+
+func (h *AdminHandler) ListAuditLogs(ctx *gin.Context) {
+	var filter dto.FilterAuditLog
+	if err := ctx.ShouldBindQuery(&filter); err != nil {
+		apperror.ValidationError(ctx, err)
+		return
+	}
+	filter.Normalize()
+	if err := filter.Validate(); err != nil {
+		apperror.ValidationError(ctx, err)
+		return
+	}
+
+	logs, count, err := h.auditService.ListAuditLogs(ctx.Request.Context(), filter)
 	if err != nil {
 		apperror.HandleError(ctx, err)
 		return

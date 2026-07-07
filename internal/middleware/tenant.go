@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kidkender/prohealth-api/internal/apperror"
@@ -23,11 +24,14 @@ func TenantMiddleware(hospitalService *service.HospitalService) gin.HandlerFunc 
 		{http.MethodGet, "/api/v1/schedule/period"}:           true,
 		{http.MethodGet, "/api/v1/schedule/period/:id/shift"}: true,
 		{http.MethodPost, "/api/v1/appointments/"}:            true,
-		{http.MethodGet, "/api/v1/admin/stats"}:               true,
-		{http.MethodGet, "/api/v1/admin/users"}:               true,
+		{http.MethodGet, "/api/v1/departments"}:               true,
 	}
 
 	return func(c *gin.Context) {
+		if strings.HasPrefix(c.FullPath(), "/api/v1/admin/") {
+			c.Next()
+			return
+		}
 		if skipRoutes[skipKey{c.Request.Method, c.FullPath()}] {
 			c.Next()
 			return

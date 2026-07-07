@@ -25,7 +25,8 @@ func (h *DepartmentHandler) CreateDepartment(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
-	department, err := h.service.CreateDepartment(c.Request.Context(), payload)
+	actorID := context.UserId(c)
+	department, err := h.service.CreateDepartment(c.Request.Context(), actorID, payload)
 	if err != nil {
 		apperror.HandleError(c, err)
 		return
@@ -65,7 +66,8 @@ func (h *DepartmentHandler) UpdateDepartment(c *gin.Context) {
 		apperror.ValidationError(c, err)
 		return
 	}
-	department, err := h.service.UpdateDepartment(c.Request.Context(), id, payload)
+	actorID := context.UserId(c)
+	department, err := h.service.UpdateDepartment(c.Request.Context(), actorID, id, payload)
 	if err != nil {
 		apperror.HandleError(c, err)
 		return
@@ -78,7 +80,8 @@ func (h *DepartmentHandler) DeleteDepartment(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.service.DeleteDepartment(c.Request.Context(), id); err != nil {
+	actorID := context.UserId(c)
+	if err := h.service.DeleteDepartment(c.Request.Context(), actorID, id); err != nil {
 		apperror.HandleError(c, err)
 		return
 	}
