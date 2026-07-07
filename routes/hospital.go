@@ -19,4 +19,8 @@ func RegisterHospitalRoutes(router gin.IRouter, handler *handler.HospitalHandler
 	hospital.GET("/:id", handler.GetHospitalByID)
 	hospital.PUT("/:id", middleware.RequireSystemRole(model.SystemRoleAdmin), handler.UpdateHospital)
 	hospital.DELETE("/:id", middleware.RequireSystemRole(model.SystemRoleAdmin), handler.DeleteHospital)
+
+	hospital.GET("/admin/stats", handler.GetHospitalStats, middleware.RequireRole(model.RoleAdmin))
+	hospital.GET("/admin/appointment-trends", middleware.RequireRole(model.RoleAdmin), handler.GetAppointmentTrends)
+	hospital.GET("/admin/department-performance", middleware.RequireRole(model.RoleAdmin), handler.GetDepartmentPerformance)
 }

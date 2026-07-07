@@ -3,6 +3,7 @@ package apperror
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"reflect"
 	"strings"
@@ -53,10 +54,29 @@ func ValidationError(c *gin.Context, err error) {
 
 	fields := make(map[string]string)
 	for _, e := range ve {
-		fields[e.Field()] = e.Tag()
+		fields[e.Field()] = fieldErrorMessage(e)
 	}
 	c.JSON(http.StatusBadRequest, gin.H{
 		"error":  "error.validate.failed",
 		"fields": fields,
 	})
+}
+
+func fieldErrorMessage(e validator.FieldError) string {
+	switch e.Tag() {
+	case "required":
+		return "This field is required"
+	case "datetime":
+		return fmt.Sprintf("Invalid format, expected: %s", e.Param())
+	case "email":
+		return "Invalid email format"
+	case "oneof":
+		return fmt.Sprintf("Must be one of: %s", e.Param())
+	case "min":
+		return fmt.Sprintf("Must be at least %s", e.Param())
+	case "max":
+		return fmt.Sprintf("Must be at most %s", e.Param())
+	default:
+		return fmt.Sprintf("Failed on '%s' validation", e.Tag())
+	}
 }

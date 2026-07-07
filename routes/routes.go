@@ -31,6 +31,7 @@ func RegisterRoutes(
 	hospitalHandler := handler.NewHospitalHandler(c.HospitalService)
 	adminHandler := handler.NewAdminHandler(c.AdminService, c.UserService, c.AuditService, c.HospitalService)
 	departmentHandler := handler.NewDepartmentHandler(c.DepartmentService)
+	invitationHandler := handler.NewInvitationHandler(c.InvitationService)
 
 	RegisterAuthRoutes(api, authHandler, authLimiter)
 	RegisterUserRoutes(api, userHandler)
@@ -39,4 +40,5 @@ func RegisterRoutes(
 	RegisterHospitalRoutes(api, hospitalHandler)
 	RegisterAdminRoutes(api, adminHandler)
 	RegisterDepartmentRoutes(api, departmentHandler)
+	RegisterInvitationRoutes(api, invitationHandler)
 }

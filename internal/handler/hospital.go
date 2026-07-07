@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kidkender/prohealth-api/internal/apperror"
@@ -154,4 +155,40 @@ func (h *HospitalHandler) GetHospitalByMe(c *gin.Context) {
 		mapped = append(mapped, response.ToMyHospitalResponse(r.Hospital, r.Role))
 	}
 	c.JSON(http.StatusOK, response.Ok(mapped))
+}
+
+func (h *HospitalHandler) GetHospitalStats(c *gin.Context) {
+	hospitalID := context.HospitalId(c)
+	stat, err := h.service.GetHospitalStats(c.Request.Context(), hospitalID)
+	if err != nil {
+		apperror.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, response.Ok(stat))
+}
+
+func (h *HospitalHandler) GetAppointmentTrends(c *gin.Context) {
+	hospitalID := context.HospitalId(c)
+	interval := c.DefaultQuery("interval", service.TrendIntervalWeek)
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "5"))
+	if err != nil {
+		apperror.ValidationError(c, err)
+		return
+	}
+	result, err := h.service.GetAppointmentTrends(c.Request.Context(), hospitalID, interval, limit)
+	if err != nil {
+		apperror.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, response.Ok(result))
+}
+
+func (h *HospitalHandler) GetDepartmentPerformance(c *gin.Context) {
+	hospitalID := context.HospitalId(c)
+	result, err := h.service.GetDepartmentPerformance(c.Request.Context(), hospitalID)
+	if err != nil {
+		apperror.HandleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, response.Ok(result))
 }

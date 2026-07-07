@@ -24,9 +24,17 @@ var ErrInvalidUserStatus = BadRequest("error.user.invalid_status")
 
 // Hospital
 var ErrHospitalMemberNotFound = NotFound("error.hospital_member.not_found")
+var ErrHospitalMemberAlreadyExists = Conflict("error.hospital_member.already_exists")
 var ErrHospitalSlugAlreadyExists = Conflict("error.hospital.slug.already_exists")
 var ErrHospitalNotFound = NotFound("error.hospital.not_found")
 var ErrHospitalHasDependents = Conflict("error.hospital.has_dependents")
+var ErrInvalidTrendInterval = BadRequest("error.hospital.invalid_trend_interval")
+
+// Hospital Invitation
+var ErrInvitationNotFound = NotFound("error.invitation.not_found")
+var ErrInvitationExpired = BadRequest("error.invitation.expired")
+var ErrInvitationAlreadyProcessed = Conflict("error.invitation.already_processed")
+var ErrInvitationAlreadyPending = Conflict("error.invitation.already_pending")
 
 // Department
 var ErrDepartmentNotFound = NotFound("error.department.not_found")

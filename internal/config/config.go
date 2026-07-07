@@ -21,6 +21,7 @@ type Config struct {
 	SMTPUsername string
 	SMTPPassword string
 	MailFrom     string
+	FrontendURL  string
 
 	ConsumerName string
 }
@@ -44,6 +45,11 @@ func LoadEnv() *Config {
 		origins = strings.Split(corsOrigins, ",")
 	}
 
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:3000"
+	}
+
 	return &Config{
 		JWTSecret:    requireEnv("JWT_SECRET"),
 		DBHost:       requireEnv("DB_HOST"),
@@ -58,6 +64,7 @@ func LoadEnv() *Config {
 		SMTPUsername: requireEnv("SMTP_USERNAME"),
 		SMTPPassword: requireEnv("SMTP_PASSWORD"),
 		MailFrom:     requireEnv("MAIL_FROM"),
+		FrontendURL:  frontendURL,
 		ConsumerName: requireEnv("CONSUMER_NAME"),
 	}
 }

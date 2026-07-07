@@ -22,6 +22,7 @@ type Container struct {
 	AdminService       *service.AdminService
 	AuditService       *service.AuditService
 	DepartmentService  *service.DepartmentService
+	InvitationService  *service.InvitationService
 	OutboxWorker       *outbox.OutboxWorker
 	RedisClient        *redis.Client
 	Logger             *slog.Logger
@@ -59,6 +60,7 @@ func New(db *gorm.DB, cfg *config.Config) (*Container, error) {
 		AdminService:       service.NewAdminService(db),
 		AuditService:       service.NewAuditService(db),
 		DepartmentService:  service.NewDepartmentService(db),
+		InvitationService:  service.NewInvitationService(db, mailService, cfg.FrontendURL),
 		OutboxWorker:       outbox.NewOutboxWorker(db, redisClient),
 		RedisClient:        redisClient,
 		Logger:             logger,

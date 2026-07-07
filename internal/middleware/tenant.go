@@ -14,6 +14,7 @@ func TenantMiddleware(hospitalService *service.HospitalService) gin.HandlerFunc 
 	skipRoutes := map[skipKey]bool{
 		{http.MethodPost, "/api/v1/auth/register"}:            true,
 		{http.MethodPost, "/api/v1/auth/login"}:               true,
+		{http.MethodPost, "/api/v1/invitations/accept"}:       true,
 		{http.MethodPut, "/api/v1/auth/change-password"}:      true,
 		{http.MethodGet, "/api/v1/health"}:                    true,
 		{http.MethodGet, "/api/v1/users/me"}:                  true,

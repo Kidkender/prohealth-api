@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/kidkender/prohealth-api/internal/apperror"
@@ -178,6 +180,34 @@ func (s *HospitalService) DeleteHospital(ctx context.Context, actorID uint, id u
 	})
 }
 
+type HospitalStatsResult struct {
+	Appointments     AppointmentStatResult `json:"appointments"`
+	HospitalOverview HospitalOverview      `json:"hospital_overview"`
+}
+
+func (s *HospitalService) GetHospitalStats(ctx context.Context, hospitalID uint) (HospitalStatsResult, error) {
+	var stat HospitalStatsResult
+
+	s.db.WithContext(ctx).Model(&model.Appointment{}).Where("hospital_id = ?", hospitalID).Count(&stat.Appointments.Total)
+	s.db.WithContext(ctx).Model(&model.Appointment{}).Where("status = ? AND hospital_id = ?", model.AppointmentPending, hospitalID).Count(&stat.Appointments.Pending)
+	s.db.WithContext(ctx).Model(&model.Appointment{}).Where("status = ? AND hospital_id = ?", model.AppointmentConfirmed, hospitalID).Count(&stat.Appointments.Confirmed)
+	if err := s.db.WithContext(ctx).
+		Model(&model.Hospital{}).
+		Select(`hospitals.id,
+				    hospitals.name,
+				     COUNT(DISTINCT hospital_members.user_id) AS member_count,
+				     COUNT(DISTINCT appointments.id) AS appointments_this_month
+			`).
+		Joins("LEFT JOIN hospital_members ON  hospital_members.hospital_id = hospitals.id").
+		Joins("LEFT JOIN appointments ON appointments.hospital_id = hospitals.id AND DATE_TRUNC('month', appointments.created_at) = DATE_TRUNC('month', NOW())").
+		Where("hospitals.id = ?", hospitalID).
+		Group("hospitals.id, hospitals.name").
+		Scan(&stat.HospitalOverview).Error; err != nil {
+		return stat, err
+	}
+	return stat, nil
+}
+
 type HospitalDoctor struct {
 	UserID   uint   `json:"user_id"`
 	Fullname string `json:"fullname"`
@@ -277,4 +307,105 @@ func (s *HospitalService) GetHospitalByUser(ctx context.Context, userID uint) ([
 		Where("hospital_members.user_id = ?", userID).
 		Scan(&results).Error
 	return results, err
+}
+
+const (
+	TrendIntervalWeek  = "week"
+	TrendIntervalMonth = "month"
+)
+
+type AppointmentTrendPoint struct {
+	PeriodStart time.Time `json:"period_start"`
+	Total       int64     `json:"total"`
+	Cancelled   int64     `json:"cancelled"`
+	NoShowRate  float64   `json:"no_show_rate"`
+}
+
+type TopDoctor struct {
+	UserID           uint   `json:"user_id"`
+	Fullname         string `json:"fullname"`
+	AppointmentCount int64  `json:"appointment_count"`
+}
+
+type AppointmentTrendResult struct {
+	Interval   string                  `json:"interval"`
+	Trends     []AppointmentTrendPoint `json:"trends"`
+	TopDoctors []TopDoctor             `json:"top_doctors"`
+}
+
+func (s *HospitalService) GetAppointmentTrends(ctx context.Context, hospitalID uint, interval string, topDoctorLimit int) (AppointmentTrendResult, error) {
+	result := AppointmentTrendResult{Interval: interval}
+
+	if interval != TrendIntervalWeek && interval != TrendIntervalMonth {
+		return result, apperror.ErrInvalidTrendInterval
+	}
+	if topDoctorLimit <= 0 {
+		topDoctorLimit = 5
+	}
+
+	if err := s.db.WithContext(ctx).
+		Model(&model.Appointment{}).
+		Select(fmt.Sprintf(`DATE_TRUNC('%s', schedule_shifts.date) AS period_start,
+			COUNT(*) AS total,
+			COUNT(*) FILTER (WHERE appointments.status = ?) AS cancelled`, interval), model.AppointmentCancelled).
+		Joins("JOIN schedule_shifts ON schedule_shifts.id = appointments.shift_id").
+		Where("appointments.hospital_id = ?", hospitalID).
+		Group("period_start").
+		Order("period_start").
+		Scan(&result.Trends).Error; err != nil {
+		return result, err
+	}
+
+	for i := range result.Trends {
+		if result.Trends[i].Total > 0 {
+			result.Trends[i].NoShowRate = float64(result.Trends[i].Cancelled) / float64(result.Trends[i].Total)
+		}
+	}
+
+	if err := s.db.WithContext(ctx).
+		Model(&model.Appointment{}).
+		Select(`user_details.user_id, user_details.full_name AS fullname, COUNT(DISTINCT appointments.id) AS appointment_count`).
+		Joins("JOIN schedule_shifts ON schedule_shifts.id = appointments.shift_id").
+		Joins("JOIN schedule_shift_doctors ON schedule_shift_doctors.shift_id = schedule_shifts.id").
+		Joins("JOIN user_details ON user_details.user_id = schedule_shift_doctors.user_id").
+		Where("appointments.hospital_id = ?", hospitalID).
+		Group("user_details.user_id, user_details.full_name").
+		Order("appointment_count DESC").
+		Limit(topDoctorLimit).
+		Scan(&result.TopDoctors).Error; err != nil {
+		return result, err
+	}
+
+	return result, nil
+}
+
+type DepartmentPerformance struct {
+	DepartmentID   uint   `json:"department_id"`
+	DepartmentName string `json:"department_name"`
+	Total          int64  `json:"total"`
+	Completed      int64  `json:"completed"`
+	Cancelled      int64  `json:"cancelled"`
+}
+
+func (s *HospitalService) GetDepartmentPerformance(ctx context.Context, hospitalID uint) ([]DepartmentPerformance, error) {
+	var results []DepartmentPerformance
+	if err := s.db.WithContext(ctx).
+		Model(&model.Appointment{}).
+		Select(`schedule_shifts.department_id AS department_id,
+			departments.name AS department_name,
+			COUNT(*) AS total,
+			COUNT(*) FILTER (WHERE appointments.status = ?) AS completed,
+			COUNT(*) FILTER (WHERE appointments.status = ?) AS cancelled`,
+			model.AppointmentCompleted, model.AppointmentCancelled).
+		Joins("JOIN schedule_shifts ON schedule_shifts.id = appointments.shift_id").
+		Joins("JOIN departments ON departments.id = schedule_shifts.department_id").
+		Where("appointments.hospital_id = ?", hospitalID).
+		Group("schedule_shifts.department_id, departments.name").
+		Order("total DESC").
+		Scan(&results).Error; err != nil {
+		return nil, err
+	}
+
+	slog.Info("result: ", "results", results)
+	return results, nil
 }

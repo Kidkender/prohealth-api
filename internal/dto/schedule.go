@@ -61,8 +61,8 @@ type FilterScheduleShift struct {
 
 type GenerateScheduleInput struct {
 	StartDate *time.Time `json:"start_date"`
-	StartTime string     `json:"start_time" binding:"required"`
-	EndTime   string     `json:"end_time" binding:"required"`
+	StartTime string     `json:"start_time" binding:"required,datetime=15:04"`
+	EndTime   string     `json:"end_time" binding:"required,datetime=15:04"`
 }
 
 type GenerateScheduleResponse struct {
