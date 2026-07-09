@@ -51,5 +51,11 @@ var ErrDoctorAlreadyAssigned = Conflict("error.schedule.doctor.already_assigned"
 
 // Appointment
 var ErrAppointmentNotFound = NotFound("error.appointment.not_found")
+var ErrInvalidAppointmentTime = BadRequest("error.appointment.invalid_time")
 
 var ErrSchedulePeriodGenerating = Conflict("error.schedule.period.generating")
+
+// Shift
+var ErrShiftAlreadyBooked = Conflict("error.shift.already_booked")
+var ErrShiftNotFound = NotFound("error.shift.not_found")
+var ErrShiftNotAvailable = Conflict("error.shift.not_available")

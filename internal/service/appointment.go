@@ -8,13 +8,17 @@ import (
 
 	"github.com/kidkender/prohealth-api/internal/apperror"
 	"github.com/kidkender/prohealth-api/internal/audit"
+	"github.com/kidkender/prohealth-api/internal/cache"
 	"github.com/kidkender/prohealth-api/internal/dto"
 	"github.com/kidkender/prohealth-api/internal/event"
+	"github.com/kidkender/prohealth-api/internal/lock"
 	"github.com/kidkender/prohealth-api/internal/model"
 	"github.com/kidkender/prohealth-api/internal/outbox"
 	"github.com/kidkender/prohealth-api/internal/timeutil"
 	"gorm.io/gorm"
 )
+
+const appointmentDuration = 30 * time.Minute
 
 type AppointmentResult struct {
 	ID              uint   `json:"id"`
@@ -32,23 +36,68 @@ type AppointmentService struct {
 	db   *gorm.DB
 	mail *MailService
 	pub  *outbox.Publisher
+	lock *lock.DistributedLock
 }
 
-func NewAppointmentService(db *gorm.DB, mail *MailService, pub *outbox.Publisher) *AppointmentService {
-	return &AppointmentService{db: db, mail: mail, pub: pub}
+func NewAppointmentService(
+	db *gorm.DB,
+	mail *MailService,
+	pub *outbox.Publisher,
+	lock *lock.DistributedLock,
+) *AppointmentService {
+	return &AppointmentService{db: db, mail: mail, pub: pub, lock: lock}
 }
 
 func (s *AppointmentService) CreateAppointment(ctx context.Context, payload dto.CreateAppointmentInput, hospitalID uint) error {
 	var shift model.ScheduleShift
-	if err := s.db.WithContext(ctx).First(&shift, payload.ShiftID).Error; err != nil {
+	if err := s.db.WithContext(ctx).
+		Joins("JOIN schedule_shift_doctors ON schedule_shift_doctors.shift_id = schedule_shifts.id").
+		Preload("Doctors.UserDetail").
+		First(&shift, payload.ShiftID).Error; err != nil {
 		return err
+	}
+
+	if hospitalID != shift.HospitalID {
+		slog.Error("create_appointment", "hospital_id", hospitalID, "shift_hospital_id", shift.HospitalID)
+		return apperror.ErrShiftNotFound
+	}
+
+	if shift.Status != model.ShiftScheduled {
+		slog.Error("create_appointment", "shift_status", shift.Status)
+		return apperror.ErrShiftNotFound
+	}
+
+	if len(shift.Doctors) == 0 {
+		slog.Error("create_appointment", "doctors_count", len(shift.Doctors))
+		return apperror.ErrShiftNotFound
 	}
 
 	appointmentTime := payload.AppointmentTime
 	if t, err := time.Parse(time.RFC3339, payload.AppointmentTime); err == nil {
 		appointmentTime = t.Format("15:04")
 	}
+
+	overlap, err := s.hasOverlappingAppointment(ctx, shift.ID, appointmentTime)
+	if err != nil {
+		return err
+	}
+	if overlap {
+		return apperror.ErrShiftAlreadyBooked
+	}
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		bookingKey := cache.BookingShiftKey(shift.ID)
+		lockValue, err := s.lock.Acquire(ctx, bookingKey, 5*time.Second)
+		if err != nil {
+			return err
+		}
+		if lockValue == "" {
+			return apperror.ErrShiftAlreadyBooked
+		}
+		defer func() {
+			if err := s.lock.Release(ctx, bookingKey, lockValue); err != nil {
+				slog.Error("Failed to release lock booking: ", "err", err)
+			}
+		}()
 
 		appointment := model.Appointment{
 			ShiftID:         payload.ShiftID,
@@ -75,6 +124,61 @@ func (s *AppointmentService) CreateAppointment(ctx context.Context, payload dto.
 			Time:          appointmentTime,
 		})
 	})
+}
+
+func parseClockTime(s string) (time.Time, error) {
+	if t, err := time.Parse("15:04:05", s); err == nil {
+		return t, nil
+	}
+	return time.Parse("15:04", s)
+}
+
+func (s *AppointmentService) hasOverlappingAppointment(ctx context.Context, shiftID uint, appointmentTime string) (bool, error) {
+	newStart, err := parseClockTime(appointmentTime)
+	if err != nil {
+		slog.Error("parseClockTime", "err", err)
+		return false, apperror.ErrInvalidAppointmentTime
+	}
+	newEnd := newStart.Add(appointmentDuration)
+
+	var existing []model.Appointment
+	if err := s.db.WithContext(ctx).
+		Model(&model.Appointment{}).
+		Where("shift_id = ?", shiftID).
+		Where("status IN ?", []model.AppointmentStatus{
+			model.AppointmentPending,
+			model.AppointmentConfirmed,
+			model.AppointmentCompleted,
+		}).
+		Find(&existing).Error; err != nil {
+		return false, err
+	}
+
+	for _, a := range existing {
+		existingStart, err := parseClockTime(a.AppointmentTime)
+		if err != nil {
+			continue
+		}
+		existingEnd := existingStart.Add(appointmentDuration)
+		if newStart.Before(existingEnd) && existingStart.Before(newEnd) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (s *AppointmentService) ListBookedTimes(ctx context.Context, shiftID uint) ([]string, error) {
+	var times []string
+	err := s.db.WithContext(ctx).
+		Model(&model.Appointment{}).
+		Where("shift_id = ?", shiftID).
+		Where("status IN ?", []model.AppointmentStatus{
+			model.AppointmentPending,
+			model.AppointmentConfirmed,
+			model.AppointmentCompleted,
+		}).
+		Pluck("appointment_time", &times).Error
+	return times, err
 }
 
 func (s *AppointmentService) GetAppointments(ctx context.Context, hospitalID uint, filter dto.FilterAppointment) ([]AppointmentResult, int64, error) {

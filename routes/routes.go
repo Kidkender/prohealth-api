@@ -32,6 +32,7 @@ func RegisterRoutes(
 	adminHandler := handler.NewAdminHandler(c.AdminService, c.UserService, c.AuditService, c.HospitalService)
 	departmentHandler := handler.NewDepartmentHandler(c.DepartmentService)
 	invitationHandler := handler.NewInvitationHandler(c.InvitationService)
+	chatHandler := handler.NewChatHandler(c.AgentService)
 
 	RegisterAuthRoutes(api, authHandler, authLimiter)
 	RegisterUserRoutes(api, userHandler)
@@ -41,4 +42,6 @@ func RegisterRoutes(
 	RegisterAdminRoutes(api, adminHandler)
 	RegisterDepartmentRoutes(api, departmentHandler)
 	RegisterInvitationRoutes(api, invitationHandler)
+
+	RegisterChatRoutes(api, chatHandler)
 }

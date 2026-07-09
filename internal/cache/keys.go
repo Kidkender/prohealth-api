@@ -21,3 +21,11 @@ func LockSechduleKey(hospitalID uint) string {
 func IdempotencyKey(scope, path, key string) string {
 	return fmt.Sprintf("idempotency:%s:%s:%s", scope, path, key)
 }
+
+func ChatSessionKey(sessionID string) string {
+	return fmt.Sprintf("chat:session:%s", sessionID)
+}
+
+func BookingShiftKey(shiftID uint) string {
+	return fmt.Sprintf("booking:shift:%d", shiftID)
+}

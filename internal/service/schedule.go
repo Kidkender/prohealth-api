@@ -241,6 +241,48 @@ func (s *ScheduleService) GetScheduleShifts(ctx context.Context, hospitalID uint
 	if err := query.
 		Limit(filter.Limit).
 		Offset(filter.Offset()).
+		Preload("Doctors.UserDetail").
+		Find(&shifts).Error; err != nil {
+		return nil, 0, err
+	}
+	return shifts, total, nil
+}
+
+func (s *ScheduleService) FindScheduleShifts(ctx context.Context, hospitalID uint, filter dto.FilterScheduleShift) ([]model.ScheduleShift, int64, error) {
+	var shifts []model.ScheduleShift
+	var total int64
+
+	query := s.db.WithContext(ctx).
+		Model(&model.ScheduleShift{}).
+		Where("hospital_id = ?", hospitalID)
+
+	if filter.PeriodID != nil {
+		query = query.Where("period_id = ?", *filter.PeriodID)
+	}
+	if filter.DepartmentID != nil {
+		query = query.Where("department_id = ?", *filter.DepartmentID)
+	}
+	if filter.Date != nil {
+		query = query.Where("date = ?", *filter.Date)
+	}
+	if filter.StartTime != nil {
+		query = query.Where("time_start = ?", *filter.StartTime)
+	}
+	if filter.EndTime != nil {
+		query = query.Where("time_end = ?", *filter.EndTime)
+	}
+	if filter.RoomNumber != nil {
+		query = query.Where("room_number = ?", *filter.RoomNumber)
+	}
+	if filter.Status != nil {
+		query = query.Where("status = ?", *filter.Status)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	if err := query.
+		Preload("Doctors.UserDetail").
 		Find(&shifts).Error; err != nil {
 		return nil, 0, err
 	}

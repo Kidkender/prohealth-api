@@ -24,6 +24,9 @@ type Config struct {
 	FrontendURL  string
 
 	ConsumerName string
+
+	OpenAIAPIKey string
+	OpenAIModel  string
 }
 
 func requireEnv(key string) string {
@@ -66,6 +69,8 @@ func LoadEnv() *Config {
 		MailFrom:     requireEnv("MAIL_FROM"),
 		FrontendURL:  frontendURL,
 		ConsumerName: requireEnv("CONSUMER_NAME"),
+		OpenAIAPIKey: requireEnv("OPENAI_API_KEY"),
+		OpenAIModel:  requireEnv("OPENAI_MODEL"),
 	}
 }
 

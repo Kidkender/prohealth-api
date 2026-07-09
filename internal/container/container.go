@@ -5,6 +5,7 @@ import (
 
 	"github.com/kidkender/prohealth-api/internal/cache"
 	"github.com/kidkender/prohealth-api/internal/config"
+	"github.com/kidkender/prohealth-api/internal/llm"
 	"github.com/kidkender/prohealth-api/internal/lock"
 	"github.com/kidkender/prohealth-api/internal/logger"
 	"github.com/kidkender/prohealth-api/internal/outbox"
@@ -27,6 +28,7 @@ type Container struct {
 	RedisClient        *redis.Client
 	Logger             *slog.Logger
 	Publisher          *outbox.Publisher
+	AgentService       *service.AgentService
 }
 
 func New(db *gorm.DB, cfg *config.Config) (*Container, error) {
@@ -50,12 +52,13 @@ func New(db *gorm.DB, cfg *config.Config) (*Container, error) {
 
 	logger := logger.New()
 	publisher := outbox.NewPublisher()
+	llmProvider := llm.NewOpenAIProvider(cfg.OpenAIAPIKey, cfg.OpenAIModel)
 
 	return &Container{
 		AuthService:        service.NewAuthService(db),
 		UserService:        service.NewUserService(db),
 		ScheduleService:    service.NewScheduleService(db, distLock),
-		AppointmentService: service.NewAppointmentService(db, mailService, publisher),
+		AppointmentService: service.NewAppointmentService(db, mailService, publisher, distLock),
 		HospitalService:    service.NewHospitalService(db, cacheClient),
 		AdminService:       service.NewAdminService(db),
 		AuditService:       service.NewAuditService(db),
@@ -64,5 +67,13 @@ func New(db *gorm.DB, cfg *config.Config) (*Container, error) {
 		OutboxWorker:       outbox.NewOutboxWorker(db, redisClient),
 		RedisClient:        redisClient,
 		Logger:             logger,
+		AgentService: service.NewAgentService(
+			cacheClient,
+			llmProvider,
+			service.NewScheduleService(db, distLock),
+			service.NewHospitalService(db, cacheClient),
+			service.NewDepartmentService(db),
+			service.NewAppointmentService(db, mailService, publisher, distLock),
+		),
 	}, nil
 }
