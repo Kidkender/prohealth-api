@@ -27,6 +27,7 @@ func NewOutboxWorker(db *gorm.DB, redis *redis.Client) *OutboxWorker {
 
 func (w *OutboxWorker) Run(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 
 	for {
 		select {

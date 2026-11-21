@@ -2,8 +2,10 @@ package notification
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/kidkender/prohealth-api/internal/cache"
@@ -39,12 +41,26 @@ func NewConsumer(
 	}
 }
 
+// Run blocks until ctx is cancelled and both loops have returned, so no message
+// is cut off mid-processing at shutdown.
 func (c *NotificationConsumer) Run(ctx context.Context) {
-	go c.recoverPendingMessages(ctx)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		c.recoverPendingMessages(ctx)
+	}()
 	c.consumeNewMessages(ctx)
+	wg.Wait()
 }
 
+const (
+	minReadBackoff = 500 * time.Millisecond
+	maxReadBackoff = 30 * time.Second
+)
+
 func (c *NotificationConsumer) consumeNewMessages(ctx context.Context) {
+	backoff := minReadBackoff
 
 	for {
 		select {
@@ -63,12 +79,23 @@ func (c *NotificationConsumer) consumeNewMessages(ctx context.Context) {
 		}).Result()
 
 		if err != nil {
-			if err == redis.Nil {
+			if errors.Is(err, redis.Nil) {
 				continue
 			}
-			slog.Info("xreadgroup error: ", "err", err)
-
+			if ctx.Err() != nil {
+				continue // shutting down: the select above returns
+			}
+			// Redis is unreachable or the group is missing: wait before retrying
+			// instead of spinning and flooding the log.
+			slog.Error("xreadgroup error", "err", err, "retry_in", backoff)
+			select {
+			case <-ctx.Done():
+			case <-time.After(backoff):
+			}
+			backoff = min(backoff*2, maxReadBackoff)
+			continue
 		}
+		backoff = minReadBackoff
 		if len(entries) == 0 {
 			continue
 		}
